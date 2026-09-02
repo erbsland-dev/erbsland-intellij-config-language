@@ -1,0 +1,51 @@
+name: Release Package
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          # Reuse the default-branch cache, but do not store verifier IDEs in
+          # GitHub's repository cache: a release-tag cache is not reusable.
+          cache-read-only: true
+      - name: Validate release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag '$RELEASE_TAG' must be a semantic version such as v1.2.3."
+            exit 1
+          fi
+          if [[ "$(gh release view "$RELEASE_TAG" --json isImmutable --jq .isImmutable)" == "true" ]]; then
+            echo "Release '$RELEASE_TAG' is immutable, so assets cannot be attached after publication."
+            echo "Use a draft-first release workflow before enabling immutable releases."
+            exit 1
+          fi
+      - name: Test, verify, and build plugin
+        run: ./gradlew test verifyPluginProjectConfiguration verifyPlugin buildPlugin
+      - name: Attach plugin ZIP to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" build/distributions/*.zip --clobber

@@ -1,0 +1,39 @@
+<idea-plugin url="https://github.com/erbsland-dev/erbsland-intellij-config-language">
+    <id>dev.erbsland.elcl</id>
+    <name>Erbsland Configuration Language (ELCL)</name>
+    <vendor url="https://erbsland.dev/" email="github@erbsland.dev">Erbsland DEV</vendor>
+
+    <description><![CDATA[
+        <p>Language support for the Erbsland Configuration Language.</p>
+        <p>Provides syntax highlighting, parsing, diagnostics, ELCL-VR authoring support,
+        folding, structure view, commenting, and completion for <code>.elcl</code> files.</p>
+        <p>
+            <a href="https://config-lang.erbsland.dev/">Language reference</a> ·
+            <a href="https://github.com/erbsland-dev/erbsland-intellij-config-language">Source code</a> ·
+            <a href="https://github.com/erbsland-dev/erbsland-intellij-config-language/issues">Issue tracker</a>
+        </p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p>Initial ELCL language support for JetBrains IDEs.</p>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.lang</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType name="ELCL"
+                  language="ELCL"
+                  extensions="elcl"
+                  implementationClass="dev.erbsland.elcl.ElclFileType"
+                  fieldName="INSTANCE"/>
+        <lang.parserDefinition language="ELCL" implementationClass="dev.erbsland.elcl.ElclParserDefinition"/>
+        <lang.syntaxHighlighterFactory language="ELCL" implementationClass="dev.erbsland.elcl.highlight.ElclSyntaxHighlighterFactory"/>
+        <colorSettingsPage implementation="dev.erbsland.elcl.highlight.ElclColorSettingsPage"/>
+        <lang.commenter language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclCommenter"/>
+        <lang.braceMatcher language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclBraceMatcher"/>
+        <lang.foldingBuilder language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclFoldingBuilder"/>
+        <lang.psiStructureViewFactory language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclStructureViewFactory"/>
+        <completion.contributor language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclCompletionContributor"/>
+        <annotator language="ELCL" implementationClass="dev.erbsland.elcl.validation.ElclAnnotator"/>
+    </extensions>
+</idea-plugin>

@@ -1,0 +1,77 @@
+{
+  parserClass="dev.erbsland.elcl.parser.ElclParser"
+  psiClassPrefix="Elcl"
+  psiImplClassSuffix="Impl"
+  psiPackage="dev.erbsland.elcl.psi"
+  psiImplPackage="dev.erbsland.elcl.psi.impl.generated"
+  elementTypeHolderClass="dev.erbsland.elcl.psi.ElclTypes"
+  elementTypeClass="dev.erbsland.elcl.ElclElementType"
+  tokenTypeClass="dev.erbsland.elcl.ElclTokenType"
+
+  tokens=[
+    COMMENT="comment"
+    BAD_CHARACTER="bad_character"
+    LINE_BREAK="line_break"
+    NAME="name"
+    TEXT_NAME="text_name"
+    META_NAME="meta_name"
+    ASSIGN="assign"
+    COMMA="comma"
+    DOT="dot"
+    LIST_MARKER="list_marker"
+    SECTION_MAP_OPEN="section_map_open"
+    SECTION_MAP_CLOSE="section_map_close"
+    SECTION_LIST_OPEN="section_list_open"
+    SECTION_LIST_CLOSE="section_list_close"
+    SECTION_DECORATION="section_decoration"
+    INTEGER="integer"
+    FLOAT="float"
+    BOOLEAN="boolean"
+    TEXT="text"
+    CODE="code"
+    REGEX="regex"
+    BYTES="bytes"
+    DATE="date"
+    TIME="time"
+    DATE_TIME="date_time"
+    TIME_DELTA="time_delta"
+    MULTILINE_TEXT_OPEN="multiline_text_open"
+    MULTILINE_TEXT_CLOSE="multiline_text_close"
+    MULTILINE_TEXT_CONTENT="multiline_text_content"
+    MULTILINE_CODE_OPEN="multiline_code_open"
+    MULTILINE_CODE_CLOSE="multiline_code_close"
+    MULTILINE_CODE_CONTENT="multiline_code_content"
+    MULTILINE_REGEX_OPEN="multiline_regex_open"
+    MULTILINE_REGEX_CLOSE="multiline_regex_close"
+    MULTILINE_REGEX_CONTENT="multiline_regex_content"
+    MULTILINE_BYTES_OPEN="multiline_bytes_open"
+    MULTILINE_BYTES_CLOSE="multiline_bytes_close"
+    MULTILINE_BYTES_CONTENT="multiline_bytes_content"
+  ]
+}
+
+root ::= (LINE_BREAK | statement | BAD_CHARACTER)*
+
+private statement ::= section | assignment | meta_assignment | list_row
+
+section ::= SECTION_DECORATION* section_open name_path section_close SECTION_DECORATION*
+private section_open ::= SECTION_MAP_OPEN | SECTION_LIST_OPEN
+private section_close ::= SECTION_MAP_CLOSE | SECTION_LIST_CLOSE
+
+name_path ::= DOT? name_element (DOT name_element)*
+private name_element ::= NAME | TEXT_NAME
+
+assignment ::= assignment_name ASSIGN assignment_value?
+meta_assignment ::= META_NAME ASSIGN assignment_value?
+private assignment_name ::= NAME | TEXT_NAME
+
+private assignment_value ::= scalar_list | multiline_value | LINE_BREAK (multiline_value | list_row+)
+scalar_list ::= scalar (COMMA scalar)*
+private scalar ::= INTEGER | FLOAT | BOOLEAN | TEXT | TEXT_NAME | CODE | REGEX | BYTES | DATE | TIME | DATE_TIME | TIME_DELTA
+list_row ::= LIST_MARKER scalar_list
+
+multiline_value ::= multiline_text | multiline_code | multiline_regex | multiline_bytes
+multiline_text ::= MULTILINE_TEXT_OPEN (MULTILINE_TEXT_CONTENT | LINE_BREAK)* MULTILINE_TEXT_CLOSE
+multiline_code ::= MULTILINE_CODE_OPEN (MULTILINE_CODE_CONTENT | LINE_BREAK)* MULTILINE_CODE_CLOSE
+multiline_regex ::= MULTILINE_REGEX_OPEN (MULTILINE_REGEX_CONTENT | LINE_BREAK)* MULTILINE_REGEX_CLOSE
+multiline_bytes ::= MULTILINE_BYTES_OPEN (MULTILINE_BYTES_CONTENT | LINE_BREAK)* MULTILINE_BYTES_CLOSE
