@@ -8,6 +8,7 @@ import com.intellij.openapi.options.colors.ColorSettingsPage
 import dev.erbsland.elcl.ElclFileType
 import javax.swing.Icon
 
+/** Color-scheme page with logically grouped ELCL attributes and a complete preview. */
 class ElclColorSettingsPage : ColorSettingsPage {
     override fun getIcon(): Icon = ElclFileType.icon
     override fun getHighlighter(): SyntaxHighlighter = ElclSyntaxHighlighter(true)
@@ -19,25 +20,32 @@ class ElclColorSettingsPage : ColorSettingsPage {
 
     companion object {
         private val DESCRIPTORS = arrayOf(
-            AttributesDescriptor("Comment", ElclTextAttributes.COMMENT),
-            AttributesDescriptor("Name", ElclTextAttributes.NAME),
-            AttributesDescriptor("Text name", ElclTextAttributes.TEXT_NAME),
-            AttributesDescriptor("Meta name", ElclTextAttributes.META_NAME),
-            AttributesDescriptor("Structure and punctuation", ElclTextAttributes.STRUCTURE),
-            AttributesDescriptor("Assignment operator", ElclTextAttributes.OPERATOR),
-            AttributesDescriptor("Number", ElclTextAttributes.NUMBER),
-            AttributesDescriptor("Boolean", ElclTextAttributes.BOOLEAN),
-            AttributesDescriptor("Text", ElclTextAttributes.STRING),
-            AttributesDescriptor("Escape sequence", ElclTextAttributes.ESCAPE),
-            AttributesDescriptor("Code", ElclTextAttributes.CODE),
-            AttributesDescriptor("Regular expression", ElclTextAttributes.REGEX),
-            AttributesDescriptor("Bytes", ElclTextAttributes.BYTES),
-            AttributesDescriptor("Date and time", ElclTextAttributes.DATE_TIME),
-            AttributesDescriptor("Multiline delimiter", ElclTextAttributes.MULTILINE_DELIMITER),
+            AttributesDescriptor("General//Comment", ElclTextAttributes.COMMENT),
+            AttributesDescriptor("General//Meta name", ElclTextAttributes.META_NAME),
+            AttributesDescriptor("General//Invalid syntax", ElclTextAttributes.BAD_CHARACTER),
+            AttributesDescriptor("Sections//Delimiter", ElclTextAttributes.STRUCTURE),
+            AttributesDescriptor("Sections//Section-list delimiter", ElclTextAttributes.SECTION_LIST_DELIMITER),
+            AttributesDescriptor("Sections//Name", ElclTextAttributes.SECTION_NAME),
+            AttributesDescriptor("Sections//Text name", ElclTextAttributes.SECTION_TEXT_NAME),
+            AttributesDescriptor("Sections//Name separator", ElclTextAttributes.SECTION_NAME_SEPARATOR),
+            AttributesDescriptor("Values//Name", ElclTextAttributes.NAME),
+            AttributesDescriptor("Values//Text name", ElclTextAttributes.TEXT_NAME),
+            AttributesDescriptor("Values//Assignment operator", ElclTextAttributes.OPERATOR),
+            AttributesDescriptor("Values//Value-list separator", ElclTextAttributes.VALUE_LIST_SEPARATOR),
+            AttributesDescriptor("Values//Number", ElclTextAttributes.NUMBER),
+            AttributesDescriptor("Values//Boolean", ElclTextAttributes.BOOLEAN),
+            AttributesDescriptor("Values//Text", ElclTextAttributes.STRING),
+            AttributesDescriptor("Values//Escape sequence", ElclTextAttributes.ESCAPE),
+            AttributesDescriptor("Values//Code", ElclTextAttributes.CODE),
+            AttributesDescriptor("Values//Regular expression", ElclTextAttributes.REGEX),
+            AttributesDescriptor("Values//Bytes", ElclTextAttributes.BYTES),
+            AttributesDescriptor("Values//Date and time", ElclTextAttributes.DATE_TIME),
+            AttributesDescriptor("Values//Multiline delimiter", ElclTextAttributes.MULTILINE_DELIMITER),
+            AttributesDescriptor("Values//Language or format identifier", ElclTextAttributes.MULTILINE_TAG),
+            AttributesDescriptor("Values//Ignored multiline whitespace", ElclTextAttributes.MULTILINE_IGNORED_WHITESPACE),
             AttributesDescriptor("Validation rules//Reserved name", ElclTextAttributes.VR_RESERVED),
             AttributesDescriptor("Validation rules//Rule field", ElclTextAttributes.VR_FIELD),
             AttributesDescriptor("Validation rules//Type identifier", ElclTextAttributes.VR_TYPE),
-            AttributesDescriptor("Invalid syntax", ElclTextAttributes.BAD_CHARACTER),
         )
 
         private val DEMO = """
@@ -45,18 +53,29 @@ class ElclColorSettingsPage : ColorSettingsPage {
             @version: "1.0"
             @features: "all"
 
-            --------[ Server . Main ]--------------------------------
-            Name: "Example"
+            --------[ Server . "Main instance" ]--------------------
+            "Display name": "Example\NServer \U{1f642}"
             Enabled: yes
             Port: 8080
+            Ports: 8080, 8081
             Timeout: 30s
             Started: 2026-09-02T10:15:00Z
             Pattern: /[a-z]+/
-            Data: <01 ab cd ef>
+            Data: <hex: 01 ab cd ef>
+            Inline Code: `server.start()`
+
+            Startup Code: ```kotlin # Injected when Kotlin is available
+                fun start() = println("ready")
+                ``` # End of code
+
+            --------*[ Server . Peer ]*------------------------------
+            Name: "Backup"
 
             Message: <triple>
                 A multiline value.
                 <triple>
+
+            Broken Value: ???
 
             [server.port]
             type: "integer"

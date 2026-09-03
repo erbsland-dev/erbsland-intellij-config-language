@@ -44,6 +44,55 @@ class ElclTextAnalyzerTest {
     }
 
     @Test
+    fun `section-list entries have independent value scopes`() {
+        val source = """
+            ------------*[ Reference Groups ]
+            Page: "core/application.rst"
+            Title: "Application"
+
+            ------------*[ Reference Groups ]
+            Page: "math/integer_math.rst"
+            Title: "Integer Math"
+        """.trimIndent()
+
+        val diagnostics = ElclTextAnalyzer().analyze(source, false)
+
+        assertFalse(diagnostics.joinToString("\n") { it.message }, diagnostics.any { "duplicate" in it.message.lowercase() || "conflict" in it.message.lowercase() })
+    }
+
+    @Test
+    fun `section-list paths continue through their most recent entries`() {
+        val source = """
+            *[server]
+            name: "host01"
+            [server.filter]
+            reject: "udp"
+
+            *[server]
+            name: "host02"
+            [server.filter]
+            reject: "tcp"
+        """.trimIndent()
+
+        val diagnostics = ElclTextAnalyzer().analyze(source, false)
+
+        assertFalse(diagnostics.joinToString("\n") { it.message }, diagnostics.any { "duplicate" in it.message.lowercase() || "conflict" in it.message.lowercase() })
+    }
+
+    @Test
+    fun `duplicate values in one section-list entry are still rejected`() {
+        val source = """
+            *[server]
+            port: 8080
+            Port: 9000
+        """.trimIndent()
+
+        val diagnostics = ElclTextAnalyzer().analyze(source, false)
+
+        assertTrue(diagnostics.any { "duplicate" in it.message.lowercase() || "conflict" in it.message.lowercase() })
+    }
+
+    @Test
     fun `inline multiline opener takes indentation from first content line`() {
         val source = """
             [client.interface]
@@ -99,6 +148,53 @@ class ElclTextAnalyzerTest {
     }
 
     @Test
+    fun `code language identifiers follow the ELCL length and character rules`() {
+        val valid = ElclTextAnalyzer().analyze("[main]\ncode: ```cpp-20\n  body\n  ```\n", false)
+        val invalid = ElclTextAnalyzer().analyze("[main]\ncode: ```9invalid\n  body\n  ```\n", false)
+
+        assertFalse(valid.joinToString("\n") { it.message }, valid.any { "language identifier" in it.message.lowercase() })
+        assertTrue(invalid.any { "language identifier" in it.message.lowercase() })
+    }
+
+    @Test
+    fun `accepts supported byte syntax and reports exact single-line byte errors`() {
+        val valid = "[main]\nData: <HEX: 01ff A0 7b>\n"
+        assertFalse(ElclTextAnalyzer().analyze(valid, false).any { it.severity == ElclDiagnosticSeverity.ERROR })
+
+        val source = "[main]\nSplit: <010 203>\nCharacter: <01x2>\nFormat: <dec: 0102>\n"
+        val diagnostics = ElclTextAnalyzer().analyze(source, false)
+        assertTrue(diagnostics.any { "splits a hexadecimal byte" in it.message && source.substring(it.range.startOffset, it.range.endOffset).isBlank() })
+        assertTrue(diagnostics.any { "Illegal character 'x'" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "x" })
+        assertTrue(diagnostics.any { "Unsupported byte-data format" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "dec" })
+    }
+
+    @Test
+    fun `reports multiline byte format splits and characters at their source ranges`() {
+        val source = "[main]\nData: <<<dec\n    010 203\n    01xz\n    >>>\n"
+        val diagnostics = ElclTextAnalyzer().analyze(source, false)
+
+        assertTrue(diagnostics.any { "Unsupported byte-data format" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "dec" })
+        assertTrue(diagnostics.any { "splits a hexadecimal byte" in it.message && source.substring(it.range.startOffset, it.range.endOffset).isBlank() })
+        assertTrue(diagnostics.any { "Illegal character 'x'" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "x" })
+        assertTrue(diagnostics.any { "Illegal character 'z'" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "z" })
+    }
+
+    @Test
+    fun `text escapes are case insensitive and Unicode scalar values are validated`() {
+        val valid = "[main]\nText: \"\\N \\R \\T \\U0041 \\u{1f642}\"\n"
+        assertFalse(ElclTextAnalyzer().analyze(valid, false).any { it.severity == ElclDiagnosticSeverity.ERROR })
+
+        val source = "[main]\nUnknown: \"\\q\"\nNull: \"\\u0000\"\nSurrogate: \"\\U{D800}\"\n" +
+            "TooHigh: \"\\u{110000}\"\nMultiline: \"\"\"\n    \\Q\n    \"\"\"\n"
+        val diagnostics = ElclTextAnalyzer().analyze(source, false)
+        assertTrue(diagnostics.any { "Unknown text escape" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "\\q" })
+        assertTrue(diagnostics.any { "null code point" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "\\u0000" })
+        assertTrue(diagnostics.any { "valid Unicode scalar" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "\\U{D800}" })
+        assertTrue(diagnostics.any { "valid Unicode scalar" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "\\u{110000}" })
+        assertTrue(diagnostics.any { "Unknown text escape" in it.message && source.substring(it.range.startOffset, it.range.endOffset) == "\\Q" })
+    }
+
+    @Test
     fun `reports multiline content and closing indentation mismatches`() {
         val source = """
             [main]
@@ -125,5 +221,45 @@ class ElclTextAnalyzerTest {
 
         val escaped = ElclTextAnalyzer(root).analyze("@include: \"../outside.elcl\"\n", false, main)
         assertTrue(escaped.any { it.severity == ElclDiagnosticSeverity.WARNING && it.message.contains("outside") })
+    }
+
+    @Test
+    fun `include resets the relative-section context`() {
+        val root = Files.createTempDirectory("elcl-include-context")
+        val included = root.resolve("included.elcl")
+        Files.writeString(included, "[included]\nvalue: 1\n")
+        val main = root.resolve("main.elcl")
+        val source = """
+            [main]
+            value: 1
+            @include: "included.elcl"
+            [.child]
+            value: 2
+        """.trimIndent()
+        Files.writeString(main, source)
+
+        val diagnostics = ElclTextAnalyzer(root).analyze(source, false, main)
+
+        assertTrue(diagnostics.any { "relative section" in it.message.lowercase() })
+    }
+
+    @Test
+    fun `included section-list entries merge as independent scopes`() {
+        val root = Files.createTempDirectory("elcl-include-list")
+        val included = root.resolve("included.elcl")
+        Files.writeString(included, "*[server]\nname: \"included\"\n")
+        val main = root.resolve("main.elcl")
+        val source = """
+            *[server]
+            name: "main"
+            @include: "included.elcl"
+            *[server]
+            name: "after"
+        """.trimIndent()
+        Files.writeString(main, source)
+
+        val diagnostics = ElclTextAnalyzer(root).analyze(source, false, main)
+
+        assertFalse(diagnostics.joinToString("\n") { it.message }, diagnostics.any { "duplicate" in it.message.lowercase() || "conflict" in it.message.lowercase() })
     }
 }

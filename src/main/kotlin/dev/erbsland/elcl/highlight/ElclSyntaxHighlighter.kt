@@ -6,6 +6,7 @@ import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 import dev.erbsland.elcl.psi.ElclTypes
 
+/** Maps contextual ELCL lexer tokens to configurable editor attributes. */
 class ElclSyntaxHighlighter(private val validationRules: Boolean = false) : SyntaxHighlighterBase() {
     override fun getHighlightingLexer() = ElclHighlightingLexer(validationRules)
 
@@ -14,15 +15,19 @@ class ElclSyntaxHighlighter(private val validationRules: Boolean = false) : Synt
             ElclTypes.COMMENT -> ElclTextAttributes.COMMENT
             ElclTypes.NAME -> ElclTextAttributes.NAME
             ElclTypes.TEXT_NAME -> ElclTextAttributes.TEXT_NAME
+            ElclHighlightingLexer.SECTION_NAME -> ElclTextAttributes.SECTION_NAME
+            ElclHighlightingLexer.SECTION_TEXT_NAME -> ElclTextAttributes.SECTION_TEXT_NAME
             ElclTypes.META_NAME -> ElclTextAttributes.META_NAME
             ElclTypes.SECTION_MAP_OPEN, ElclTypes.SECTION_MAP_CLOSE,
-            ElclTypes.SECTION_LIST_OPEN, ElclTypes.SECTION_LIST_CLOSE,
-            ElclTypes.SECTION_DECORATION, ElclTypes.DOT, ElclTypes.COMMA,
-            ElclTypes.LIST_MARKER -> ElclTextAttributes.STRUCTURE
+            ElclTypes.SECTION_DECORATION -> ElclTextAttributes.STRUCTURE
+            ElclHighlightingLexer.SECTION_LIST_DELIMITER -> ElclTextAttributes.SECTION_LIST_DELIMITER
+            ElclTypes.DOT -> ElclTextAttributes.SECTION_NAME_SEPARATOR
+            ElclTypes.COMMA, ElclTypes.LIST_MARKER -> ElclTextAttributes.VALUE_LIST_SEPARATOR
             ElclTypes.ASSIGN -> ElclTextAttributes.OPERATOR
             ElclTypes.INTEGER, ElclTypes.FLOAT -> ElclTextAttributes.NUMBER
             ElclTypes.BOOLEAN -> ElclTextAttributes.BOOLEAN
             ElclTypes.TEXT, ElclTypes.MULTILINE_TEXT_CONTENT -> ElclTextAttributes.STRING
+            ElclHighlightingLexer.TEXT_ESCAPE -> ElclTextAttributes.ESCAPE
             ElclTypes.CODE, ElclTypes.MULTILINE_CODE_CONTENT -> ElclTextAttributes.CODE
             ElclTypes.REGEX, ElclTypes.MULTILINE_REGEX_CONTENT -> ElclTextAttributes.REGEX
             ElclTypes.BYTES, ElclTypes.MULTILINE_BYTES_CONTENT -> ElclTextAttributes.BYTES
@@ -31,6 +36,8 @@ class ElclSyntaxHighlighter(private val validationRules: Boolean = false) : Synt
             ElclTypes.MULTILINE_CODE_OPEN, ElclTypes.MULTILINE_CODE_CLOSE,
             ElclTypes.MULTILINE_REGEX_OPEN, ElclTypes.MULTILINE_REGEX_CLOSE,
             ElclTypes.MULTILINE_BYTES_OPEN, ElclTypes.MULTILINE_BYTES_CLOSE -> ElclTextAttributes.MULTILINE_DELIMITER
+            ElclTypes.MULTILINE_CODE_LANGUAGE, ElclTypes.MULTILINE_BYTES_FORMAT -> ElclTextAttributes.MULTILINE_TAG
+            ElclHighlightingLexer.MULTILINE_IGNORED_WHITESPACE -> ElclTextAttributes.MULTILINE_IGNORED_WHITESPACE
             ElclHighlightingLexer.VR_RESERVED -> ElclTextAttributes.VR_RESERVED
             ElclHighlightingLexer.VR_FIELD -> ElclTextAttributes.VR_FIELD
             ElclHighlightingLexer.VR_TYPE -> ElclTextAttributes.VR_TYPE

@@ -18,6 +18,10 @@ import dev.erbsland.elcl.psi.ElclTypes;
 
 %state SECTION
 %state VALUE
+%state MULTI_TEXT_HEADER
+%state MULTI_CODE_HEADER
+%state MULTI_REGEX_HEADER
+%state MULTI_BYTES_HEADER
 %state MULTI_TEXT
 %state MULTI_CODE
 %state MULTI_REGEX
@@ -31,7 +35,9 @@ META_NAME=@\p{L}[\p{L}\p{N}_]*
 TEXT="\""([^\"\\\r\n]|\\.)*"\""
 CODE=`[^`\r\n]*`
 REGEX="/"([^/\\\r\n]|\\.)*"/"
-BYTES=<([0-9a-fA-F]{2}|[ \t\r\n])+>
+/* Byte contents stay atomic so semantic validation can report the exact bad
+   format, character, or whitespace split instead of a parser recovery error. */
+BYTES=<[^<>\r\n]*>
 SIGN=[+-]?
 DIGIT=[0-9]([0-9']*[0-9])?
 BYTE_UNIT=([KkMmGgTtPpEeZzYy][Ii]?[Bb])
@@ -44,6 +50,7 @@ DATE_TIME={DATE}[Tt ]{TIME}
 TIME_UNIT=([Nn][Aa][Nn][Oo][Ss][Ee][Cc][Oo][Nn][Dd][Ss]?|[Mm][Ii][Cc][Rr][Oo][Ss][Ee][Cc][Oo][Nn][Dd][Ss]?|[Mm][Ii][Ll][Ll][Ii][Ss][Ee][Cc][Oo][Nn][Dd][Ss]?|[Ss][Ee][Cc][Oo][Nn][Dd][Ss]?|[Mm][Ii][Nn][Uu][Tt][Ee][Ss]?|[Hh][Oo][Uu][Rr][Ss]?|[Dd][Aa][Yy][Ss]?|[Ww][Ee][Ee][Kk][Ss]?|[Mm][Oo][Nn][Tt][Hh][Ss]?|[Yy][Ee][Aa][Rr][Ss]?|[Nn][Ss]|[Uu][Ss]|µ[Ss]|[Mm][Ss]|[Ss]|[Mm]|[Hh]|[Dd]|[Ww])
 TIME_DELTA={SIGN}{DIGIT}[ \t]?{TIME_UNIT}
 DECORATION=-+
+FORMAT_ID=[a-zA-Z][-_a-zA-Z0-9]{0,15}
 
 %%
 
@@ -55,10 +62,10 @@ DECORATION=-+
     "*["                      { yybegin(SECTION); return ElclTypes.SECTION_LIST_OPEN; }
     "["                       { yybegin(SECTION); return ElclTypes.SECTION_MAP_OPEN; }
     {META_NAME}               { return ElclTypes.META_NAME; }
-    "\"\"\""                    { yybegin(MULTI_TEXT); return ElclTypes.MULTILINE_TEXT_OPEN; }
-    "```"                    { yybegin(MULTI_CODE); return ElclTypes.MULTILINE_CODE_OPEN; }
-    "///"                    { yybegin(MULTI_REGEX); return ElclTypes.MULTILINE_REGEX_OPEN; }
-    "<<<"                    { yybegin(MULTI_BYTES); return ElclTypes.MULTILINE_BYTES_OPEN; }
+    "\"\"\""                    { yybegin(MULTI_TEXT_HEADER); return ElclTypes.MULTILINE_TEXT_OPEN; }
+    "```"                    { yybegin(MULTI_CODE_HEADER); return ElclTypes.MULTILINE_CODE_OPEN; }
+    "///"                    { yybegin(MULTI_REGEX_HEADER); return ElclTypes.MULTILINE_REGEX_OPEN; }
+    "<<<"                    { yybegin(MULTI_BYTES_HEADER); return ElclTypes.MULTILINE_BYTES_OPEN; }
     {TEXT}                    { return ElclTypes.TEXT_NAME; }
     {CODE}                    { return ElclTypes.CODE; }
     {REGEX}                   { return ElclTypes.REGEX; }
@@ -85,10 +92,10 @@ DECORATION=-+
     {COMMENT}                 { return ElclTypes.COMMENT; }
     {CRLF}                    { yybegin(YYINITIAL); return ElclTypes.LINE_BREAK; }
     ","                       { return ElclTypes.COMMA; }
-    "\"\"\""                    { yybegin(MULTI_TEXT); return ElclTypes.MULTILINE_TEXT_OPEN; }
-    "```"                    { yybegin(MULTI_CODE); return ElclTypes.MULTILINE_CODE_OPEN; }
-    "///"                    { yybegin(MULTI_REGEX); return ElclTypes.MULTILINE_REGEX_OPEN; }
-    "<<<"                    { yybegin(MULTI_BYTES); return ElclTypes.MULTILINE_BYTES_OPEN; }
+    "\"\"\""                    { yybegin(MULTI_TEXT_HEADER); return ElclTypes.MULTILINE_TEXT_OPEN; }
+    "```"                    { yybegin(MULTI_CODE_HEADER); return ElclTypes.MULTILINE_CODE_OPEN; }
+    "///"                    { yybegin(MULTI_REGEX_HEADER); return ElclTypes.MULTILINE_REGEX_OPEN; }
+    "<<<"                    { yybegin(MULTI_BYTES_HEADER); return ElclTypes.MULTILINE_BYTES_OPEN; }
     {BOOLEAN}                 { return ElclTypes.BOOLEAN; }
     {DATE_TIME}               { return ElclTypes.DATE_TIME; }
     {DATE}                    { return ElclTypes.DATE; }
@@ -103,28 +110,64 @@ DECORATION=-+
     "*"                       { return ElclTypes.LIST_MARKER; }
 }
 
+/* A multiline header ends at its mandatory line break. Spacing and comments
+   after the opener are ordinary ELCL syntax, not value content. */
+<MULTI_TEXT_HEADER> {
+    {SPACE}                   { return TokenType.WHITE_SPACE; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    {CRLF}                    { yybegin(MULTI_TEXT); return ElclTypes.LINE_BREAK; }
+}
+
+<MULTI_CODE_HEADER> {
+    {FORMAT_ID}               { return ElclTypes.MULTILINE_CODE_LANGUAGE; }
+    {SPACE}                   { return TokenType.WHITE_SPACE; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    {CRLF}                    { yybegin(MULTI_CODE); return ElclTypes.LINE_BREAK; }
+}
+
+<MULTI_REGEX_HEADER> {
+    {SPACE}                   { return TokenType.WHITE_SPACE; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    {CRLF}                    { yybegin(MULTI_REGEX); return ElclTypes.LINE_BREAK; }
+}
+
+<MULTI_BYTES_HEADER> {
+    {FORMAT_ID}               { return ElclTypes.MULTILINE_BYTES_FORMAT; }
+    {SPACE}                   { return TokenType.WHITE_SPACE; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    {CRLF}                    { yybegin(MULTI_BYTES); return ElclTypes.LINE_BREAK; }
+}
+
 <MULTI_TEXT> {
     [ \t]*"\"\"\""[ \t]*          { yybegin(VALUE); return ElclTypes.MULTILINE_TEXT_CLOSE; }
     {CRLF}                    { return ElclTypes.LINE_BREAK; }
-    [^\r\n]+                 { return ElclTypes.MULTILINE_TEXT_CONTENT; }
+    [^\"\r\n]+               { return ElclTypes.MULTILINE_TEXT_CONTENT; }
+    "\""                      { return ElclTypes.MULTILINE_TEXT_CONTENT; }
 }
 
 <MULTI_CODE> {
     [ \t]*"```"[ \t]*          { yybegin(VALUE); return ElclTypes.MULTILINE_CODE_CLOSE; }
     {CRLF}                    { return ElclTypes.LINE_BREAK; }
-    [^\r\n]+                 { return ElclTypes.MULTILINE_CODE_CONTENT; }
+    [^`\r\n]+                { return ElclTypes.MULTILINE_CODE_CONTENT; }
+    "`"                       { return ElclTypes.MULTILINE_CODE_CONTENT; }
 }
 
 <MULTI_REGEX> {
     [ \t]*"///"[ \t]*          { yybegin(VALUE); return ElclTypes.MULTILINE_REGEX_CLOSE; }
     {CRLF}                    { return ElclTypes.LINE_BREAK; }
-    [^\r\n]+                 { return ElclTypes.MULTILINE_REGEX_CONTENT; }
+    \\[^\r\n]                { return ElclTypes.MULTILINE_REGEX_CONTENT; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    [^\\#/\r\n]+             { return ElclTypes.MULTILINE_REGEX_CONTENT; }
+    \\                        { return ElclTypes.MULTILINE_REGEX_CONTENT; }
+    "/"                       { return ElclTypes.MULTILINE_REGEX_CONTENT; }
 }
 
 <MULTI_BYTES> {
     [ \t]*">>>"[ \t]*          { yybegin(VALUE); return ElclTypes.MULTILINE_BYTES_CLOSE; }
     {CRLF}                    { return ElclTypes.LINE_BREAK; }
-    [^\r\n]+                 { return ElclTypes.MULTILINE_BYTES_CONTENT; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    [^#>\r\n]+               { return ElclTypes.MULTILINE_BYTES_CONTENT; }
+    ">"                       { return ElclTypes.MULTILINE_BYTES_CONTENT; }
 }
 
 [^]                           { return ElclTypes.BAD_CHARACTER; }

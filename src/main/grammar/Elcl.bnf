@@ -39,12 +39,14 @@
     MULTILINE_TEXT_CLOSE="multiline_text_close"
     MULTILINE_TEXT_CONTENT="multiline_text_content"
     MULTILINE_CODE_OPEN="multiline_code_open"
+    MULTILINE_CODE_LANGUAGE="multiline_code_language"
     MULTILINE_CODE_CLOSE="multiline_code_close"
     MULTILINE_CODE_CONTENT="multiline_code_content"
     MULTILINE_REGEX_OPEN="multiline_regex_open"
     MULTILINE_REGEX_CLOSE="multiline_regex_close"
     MULTILINE_REGEX_CONTENT="multiline_regex_content"
     MULTILINE_BYTES_OPEN="multiline_bytes_open"
+    MULTILINE_BYTES_FORMAT="multiline_bytes_format"
     MULTILINE_BYTES_CLOSE="multiline_bytes_close"
     MULTILINE_BYTES_CONTENT="multiline_bytes_content"
   ]
@@ -72,6 +74,9 @@ list_row ::= LIST_MARKER scalar_list
 
 multiline_value ::= multiline_text | multiline_code | multiline_regex | multiline_bytes
 multiline_text ::= MULTILINE_TEXT_OPEN (MULTILINE_TEXT_CONTENT | LINE_BREAK)* MULTILINE_TEXT_CLOSE
-multiline_code ::= MULTILINE_CODE_OPEN (MULTILINE_CODE_CONTENT | LINE_BREAK)* MULTILINE_CODE_CLOSE
+multiline_code ::= MULTILINE_CODE_OPEN MULTILINE_CODE_LANGUAGE? (MULTILINE_CODE_CONTENT | LINE_BREAK)* MULTILINE_CODE_CLOSE {
+  implements="com.intellij.psi.PsiLanguageInjectionHost"
+  mixin="dev.erbsland.elcl.injection.ElclMultilineCodeMixin"
+}
 multiline_regex ::= MULTILINE_REGEX_OPEN (MULTILINE_REGEX_CONTENT | LINE_BREAK)* MULTILINE_REGEX_CLOSE
-multiline_bytes ::= MULTILINE_BYTES_OPEN (MULTILINE_BYTES_CONTENT | LINE_BREAK)* MULTILINE_BYTES_CLOSE
+multiline_bytes ::= MULTILINE_BYTES_OPEN MULTILINE_BYTES_FORMAT? (MULTILINE_BYTES_CONTENT | LINE_BREAK)* MULTILINE_BYTES_CLOSE

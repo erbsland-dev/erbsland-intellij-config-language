@@ -29,7 +29,11 @@ class ElclParserTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         assertInstanceOf(file, ElclFile::class.java)
-        assertEmpty(PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java))
+        val errors = PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java)
+        assertTrue(
+            errors.joinToString { "${it.textOffset}:${it.errorDescription}:${it.text}" },
+            errors.isEmpty(),
+        )
         assertEquals(3, PsiTreeUtil.collectElementsOfType(file, ElclSection::class.java).size)
         assertEquals(4, PsiTreeUtil.collectElementsOfType(file, ElclAssignment::class.java).size)
     }
@@ -43,5 +47,36 @@ class ElclParserTest : BasePlatformTestCase() {
         assertEquals(2, sections.size)
         assertEquals("healthy", sections.last().namePath.text)
         assertTrue("malformed input must remain recoverable and visible", file.text.contains("???"))
+    }
+
+    fun testMultilineHeadersAndBodyCommentsParseWithoutErrors() {
+        val file = myFixture.configureByText(
+            "multiline.elcl",
+            """
+                [main]
+                text: <triple> # opening comment
+                    # text content
+                    <triple> # closing comment
+                code: ```java # language and comment
+                    // code content
+                    ``` # closing comment
+                regex: /// # opening comment
+                    [a-z]+ # ELCL comment
+                    /// # closing comment
+                bytes: <<<hex # format and comment
+                    de ad be ef # ELCL comment
+                    >>> # closing comment
+            """.trimIndent().replace("<triple>", "\"\"\""),
+        )
+        assertEmpty(PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java))
+    }
+
+    fun testHexPrefixedSingleLineBytesAndBracedUnicodeEscapesParse() {
+        val file = myFixture.configureByText(
+            "literals.elcl",
+            "[main]\nData: <hex: 01 ff A0>\nText: \"\\u{1f642} \\N \\U0041\"\n",
+        )
+
+        assertEmpty(PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java))
     }
 }

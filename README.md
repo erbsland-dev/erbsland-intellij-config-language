@@ -5,12 +5,13 @@ PyCharm, IntelliJ IDEA, and other IntelliJ Platform IDEs.
 
 ## Features
 
-- Syntax highlighting for `.elcl` files, including every standard and advanced ELCL literal form.
+- Syntax highlighting for `.elcl` files, including escapes, multiline tags, and visually distinct whitespace that ELCL discards from multiline values.
 - ELCL syntax and semantic diagnostics.
 - ELCL-VR highlighting, completion, and rule-document diagnostics for `.vr.elcl` files.
 - Local `@include` resolution inside the current project.
-- Comment toggling, brace matching, folding, and structure view.
-- Configurable colors under **Editor | Color Scheme | Erbsland Configuration Language**.
+- Comment toggling, brace matching, folding, and a declaration-ordered semantic Structure view.
+- Language injection for tagged multiline code when the requested language is available in the IDE.
+- Logically grouped, configurable colors under **Editor | Color Scheme | Erbsland Configuration Language**.
 
 The plugin validates `.vr.elcl` rule documents themselves. It does not yet apply validation rules to ordinary
 configuration files.
@@ -52,9 +53,10 @@ uses the cross-product `com.intellij.modules.lang` API.
 
 ## Development
 
-The restartable JFlex lexer and Grammar-Kit PSI parser are generated into `build/generated/`. Only the source
-grammars in `src/main/grammar/` are versioned. The plugin depends solely on `com.intellij.modules.lang`, so it
-can be installed in any IntelliJ Platform product that provides the language API.
+The restartable JFlex lexer and Grammar-Kit PSI parser are generated into `build/generated/`. Grammar-Kit mixin
+support required by generated PSI lives in `src/main/generatedJava/`; all other generated output remains under
+`build/generated/`. The plugin depends solely on `com.intellij.modules.lang`, so it can be installed in any
+IntelliJ Platform product that provides the language API.
 
 ## Project Links
 

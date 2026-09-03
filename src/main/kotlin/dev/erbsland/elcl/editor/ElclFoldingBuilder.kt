@@ -13,6 +13,7 @@ import dev.erbsland.elcl.psi.ElclMultilineCode
 import dev.erbsland.elcl.psi.ElclMultilineRegex
 import dev.erbsland.elcl.psi.ElclMultilineText
 
+/** Builds folds for sections and multiline values without hiding declarations. */
 class ElclFoldingBuilder : FoldingBuilderEx() {
     override fun buildFoldRegions(root: PsiElement, document: Document, quick: Boolean): Array<FoldingDescriptor> {
         val descriptors = mutableListOf<FoldingDescriptor>()

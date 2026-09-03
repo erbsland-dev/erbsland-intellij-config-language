@@ -4,6 +4,7 @@ import com.intellij.openapi.fileTypes.LanguageFileType
 import com.intellij.openapi.util.IconLoader
 import javax.swing.Icon
 
+/** IntelliJ file-type registration for `.elcl` documents. */
 object ElclFileType : LanguageFileType(ElclLanguage.INSTANCE) {
     override fun getName(): String = "ELCL"
     override fun getDescription(): String = "Erbsland Configuration Language file"

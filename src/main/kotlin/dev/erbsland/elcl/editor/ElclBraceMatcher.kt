@@ -6,6 +6,7 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.tree.IElementType
 import dev.erbsland.elcl.psi.ElclTypes
 
+/** Declares the paired delimiters used by section and literal syntax. */
 class ElclBraceMatcher : PairedBraceMatcher {
     override fun getPairs(): Array<BracePair> = PAIRS
 

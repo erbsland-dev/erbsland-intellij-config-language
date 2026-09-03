@@ -35,5 +35,6 @@
         <lang.psiStructureViewFactory language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclStructureViewFactory"/>
         <completion.contributor language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclCompletionContributor"/>
         <annotator language="ELCL" implementationClass="dev.erbsland.elcl.validation.ElclAnnotator"/>
+        <multiHostInjector implementation="dev.erbsland.elcl.injection.ElclCodeLanguageInjector"/>
     </extensions>
 </idea-plugin>

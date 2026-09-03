@@ -2,6 +2,7 @@ package dev.erbsland.elcl.editor
 
 import com.intellij.lang.Commenter
 
+/** Supplies ELCL's `#` line-comment syntax to editor actions. */
 class ElclCommenter : Commenter {
     override fun getLineCommentPrefix(): String = "#"
     override fun getBlockCommentPrefix(): String? = null

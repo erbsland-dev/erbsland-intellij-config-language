@@ -15,6 +15,7 @@ import dev.erbsland.elcl.lexer.ElclLexerAdapter
 import dev.erbsland.elcl.parser.ElclParser
 import dev.erbsland.elcl.psi.ElclTypes
 
+/** Connects the restartable lexer, generated parser, and PSI file root. */
 class ElclParserDefinition : ParserDefinition {
     override fun createLexer(project: Project?): Lexer = ElclLexerAdapter()
     override fun createParser(project: Project?): PsiParser = ElclParser()

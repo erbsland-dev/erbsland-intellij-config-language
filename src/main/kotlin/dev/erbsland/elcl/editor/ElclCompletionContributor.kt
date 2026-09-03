@@ -11,6 +11,7 @@ import com.intellij.util.ProcessingContext
 import dev.erbsland.elcl.ElclFile
 import dev.erbsland.elcl.highlight.ElclHighlightingLexer
 
+/** Offers context-sensitive ELCL and ELCL-VR completion variants. */
 class ElclCompletionContributor : CompletionContributor() {
     init {
         extend(CompletionType.BASIC, PlatformPatterns.psiElement(), object : CompletionProvider<CompletionParameters>() {
