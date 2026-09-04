@@ -15,7 +15,15 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p>Initial ELCL language support for JetBrains IDEs.</p>
+        <h3>Version 0.4.1</h3>
+        <ul>
+            <li>Fix the changelog displayed in the IDE's plugin update details.</li>
+            <li>Add a semantic, source-ordered Structure view with indexed section-list entries and live updates while editing.</li>
+            <li>Correct multiline parsing, comments, indentation highlighting, and tagged code-language injection.</li>
+            <li>Group color settings and add colors for section syntax, escapes, tags, and ignored multiline whitespace.</li>
+            <li>Improve byte-data and text-escape parsing with precise diagnostics for invalid formats, splits, characters, and Unicode code points.</li>
+            <li>Expand the color preview and reorganize the implementation into focused, documented components.</li>
+        </ul>
     ]]></change-notes>
 
     <depends>com.intellij.modules.lang</depends>

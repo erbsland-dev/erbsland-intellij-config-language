@@ -1,7 +1,8 @@
 # Changelog
 
-## Version 0.4.0
+## Version 0.4.1
 
+- Fix the changelog displayed in the IDE's plugin update details.
 - Build the Structure view from semantic section scopes, preserving declaration order, relative paths, repeated section-list entries, and their values.
 - Add distinct section, section-list, value, and multiline-tag presentation, including platform Structure icons.
 - Parse multiline opener/closer comments and regex/byte comments separately from value content.
