@@ -1,6 +1,7 @@
 package dev.erbsland.elcl.validation
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class ElclVrAnalyzerTest {
@@ -97,5 +98,132 @@ class ElclVrAnalyzerTest {
         assertTrue(messages.any { "Only one alternative may define a default" in it })
         assertTrue(messages.any { "is_optional must be defined on the first alternative" in it })
         assertTrue(messages.any { "vr_entry must not define a default" in it })
+    }
+
+    @Test
+    fun `resolves index key paths relative to their vr_key scope`() {
+        val source = """
+            [Client]
+            Type: "Section"
+
+            [Client.Interface]
+            Type: "SectionList"
+
+            [Client.Interface.VR Entry.Name]
+            Type: "Text"
+
+            *[Client.VR Key]*
+            Name: "interface_name"
+            Key: "interface.vr_entry.name"
+        """.trimIndent()
+
+        val diagnostics = ElclTextAnalyzer().analyze(source, true)
+        assertFalse(diagnostics.joinToString("\n") { it.message }, diagnostics.any { "Index key path" in it.message || "Indexed values" in it.message })
+    }
+
+    @Test
+    fun `accepts index compatibility paths without explicit vr_entry`() {
+        val source = """
+            [Filter]
+            Type: "SectionList"
+            [Filter.VR Entry.Id]
+            Type: "Integer"
+            *[VR Key]*
+            Name: "filter_id"
+            Key: "filter.id"
+        """.trimIndent()
+
+        val diagnostics = ElclTextAnalyzer().analyze(source, true)
+        assertFalse(diagnostics.joinToString("\n") { it.message }, diagnostics.any { "Index key path" in it.message || "Indexed values" in it.message })
+    }
+
+    @Test
+    fun `index names are scoped and nearest visible definition wins`() {
+        val source = """
+            [Global Items]
+            Type: "SectionList"
+            [Global Items.VR Entry.Id]
+            Type: "Text"
+            *[VR Key]*
+            Name: "id"
+            Key: "global_items.vr_entry.id"
+
+            [Client]
+            Type: "Section"
+            [Client.Local Items]
+            Type: "SectionList"
+            [Client.Local Items.VR Entry.Id]
+            Type: "Text"
+            *[Client.VR Key]*
+            Name: "id"
+            Key: "local_items.vr_entry.id"
+            [Client.Selection]
+            Type: "Text"
+            Key: "id"
+        """.trimIndent()
+
+        val diagnostics = ElclTextAnalyzer().analyze(source, true)
+        assertFalse(diagnostics.joinToString("\n") { it.message }, diagnostics.any { "Duplicate normalized index" in it.message || "Unknown vr_key index" in it.message })
+    }
+
+    @Test
+    fun `escaped vr names are ordinary while unknown reserved names are rejected`() {
+        val escaped = ElclTextAnalyzer().analyze("[Settings.VR VR Headset]\nType: \"Text\"", true)
+        val reserved = ElclTextAnalyzer().analyze("[Settings.VR Headset]\nType: \"Text\"", true)
+
+        assertFalse(escaped.joinToString("\n") { it.message }, escaped.any { "Unknown reserved" in it.message })
+        assertTrue(reserved.any { "Unknown reserved" in it.message })
+    }
+
+    @Test
+    fun `rejects invisible indexes and duplicate names in the same scope`() {
+        val source = """
+            [Client]
+            Type: "Section"
+            [Client.Items]
+            Type: "SectionList"
+            [Client.Items.VR Entry.Id]
+            Type: "Text"
+            *[Client.VR Key]*
+            Name: "local"
+            Key: "items.vr_entry.id"
+            *[Client.VR Key]*
+            Name: "LOCAL"
+            Key: "items.vr_entry.id"
+            [Outside]
+            Type: "Text"
+            Key: "local"
+        """.trimIndent()
+
+        val messages = ElclTextAnalyzer().analyze(source, true).map { it.message }
+        assertTrue(messages.any { "Duplicate normalized index" in it })
+        assertTrue(messages.any { "Unknown vr_key index" in it })
+    }
+
+    @Test
+    fun `rejects nested section lists mixed composite roots and invalid target types`() {
+        val source = """
+            [First]
+            Type: "SectionList"
+            [First.VR Entry.Id]
+            Type: "Text"
+            [First.VR Entry.Children]
+            Type: "SectionList"
+            [First.VR Entry.Children.VR Entry.Id]
+            Type: "Text"
+            [Second]
+            Type: "SectionList"
+            [Second.VR Entry.Created]
+            Type: "DateTime"
+            *[VR Key]*
+            Key: "first.vr_entry.children.vr_entry.id"
+            *[VR Key]*
+            Key: "first.vr_entry.id", "second.vr_entry.created"
+        """.trimIndent()
+
+        val messages = ElclTextAnalyzer().analyze(source, true).map { it.message }
+        assertTrue(messages.any { "exactly one SectionList vr_entry" in it })
+        assertTrue(messages.any { "same SectionList" in it })
+        assertTrue(messages.any { "Integer or Text" in it })
     }
 }

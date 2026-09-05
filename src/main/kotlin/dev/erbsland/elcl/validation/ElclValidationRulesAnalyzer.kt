@@ -2,21 +2,29 @@ package dev.erbsland.elcl.validation
 
 /** Applies ELCL-VR document rules to the recoverable section model. */
 internal class ElclValidationRulesAnalyzer {
+    private data class NamedIndex(val name: String, val scope: List<String>)
+
     /** Appends validation-rule diagnostics without changing parsed document state. */
     fun validate(state: AnalysisState) {
         val templates = state.sections.filter { it.path.firstOrNull() == "vr_template" && it.path.size == 2 }
             .associateBy { it.path[1] }
-        val namedIndexes = linkedMapOf<String, RuleSection>()
+        val namedIndexes = mutableListOf<NamedIndex>()
         state.sections.filter { it.path.lastOrNull() == "vr_key" }.forEach { index ->
             index.fields["name"]?.let { field ->
                 val name = normalize(firstValue(field.value).orEmpty())
                 if (name.isEmpty()) state.error(field.valueRange, "Index name must be a non-empty ELCL name")
-                else if (namedIndexes.putIfAbsent(name, index) != null) state.error(field.valueRange, "Duplicate normalized index name '$name'")
+                else {
+                    val scope = semanticVrPath(index.path.dropLast(1))
+                    if (namedIndexes.any { it.name == name && it.scope == scope }) {
+                        state.error(field.valueRange, "Duplicate normalized index name '$name' in this scope")
+                    }
+                    namedIndexes += NamedIndex(name, scope)
+                }
             }
         }
         state.sections.forEach { section ->
-            val reserved = section.path.filter { it.startsWith("vr_") }
-            reserved.filter { it !in RESERVED_NAMES && !it.startsWith("vr_vr_") }.forEach {
+            val reserved = section.path.filter(::isReservedVrName)
+            reserved.filter { it !in RESERVED_NAMES }.forEach {
                 state.error(section.range, "Unknown reserved validation-rules name '$it'; use 'vr_$it' to escape a literal vr_ name")
             }
             if ("vr_template" in section.path && section.path.firstOrNull() != "vr_template") {
@@ -28,7 +36,7 @@ internal class ElclValidationRulesAnalyzer {
             when (section.path.lastOrNull()) {
                 "vr_dependency" -> validateDependency(state, section)
                 "vr_key" -> validateIndex(state, section)
-                else -> validateNodeRule(state, section, templates, namedIndexes.keys)
+                else -> validateNodeRule(state, section, templates, namedIndexes)
             }
         }
         validateAlternatives(state)
@@ -54,7 +62,7 @@ internal class ElclValidationRulesAnalyzer {
         state: AnalysisState,
         section: RuleSection,
         templates: Map<String, RuleSection>,
-        indexes: Set<String>,
+        indexes: List<NamedIndex>,
     ) {
         val last = section.path.lastOrNull() ?: return
         val isTemplate = section.path.firstOrNull() == "vr_template" && section.path.size == 2
@@ -86,9 +94,13 @@ internal class ElclValidationRulesAnalyzer {
         if (section.fields.containsKey("is_secret") && effectiveType in STRUCTURAL_TYPES) {
             state.error(section.fields.getValue("is_secret").nameRange, "is_secret is only valid for scalar values")
         }
-        section.fields["key"]?.let {
-            val indexName = normalize(firstValue(it.value).orEmpty().substringBefore('['))
-            if (indexName !in indexes) state.error(it.valueRange, "Unknown vr_key index reference")
+        section.fields["key"]?.let { field ->
+            valueList(field.value).forEach { reference ->
+                val indexName = normalize(reference.substringBefore('['))
+                if (findVisibleIndex(indexName, semanticVrPath(section.path), indexes) == null) {
+                    state.error(field.valueRange, "Unknown vr_key index reference '$reference' in this scope")
+                }
+            }
         }
         if (effectiveType in LIST_TYPES) {
             val hasEntry = state.sections.any { candidate ->
@@ -99,6 +111,9 @@ internal class ElclValidationRulesAnalyzer {
         }
         validateFieldsAndConstraints(state, section, effectiveType)
     }
+
+    private fun findVisibleIndex(name: String, nodePath: List<String>, indexes: List<NamedIndex>): NamedIndex? =
+        indexes.filter { it.name == name && nodePath.take(it.scope.size) == it.scope }.maxByOrNull { it.scope.size }
 
     private fun validateEntry(state: AnalysisState, section: RuleSection, type: RuleField?, effectiveType: String?) {
         val parentType = state.sections.find { it.path == section.path.dropLast(1) }
@@ -208,22 +223,55 @@ internal class ElclValidationRulesAnalyzer {
         section.fields["key"]?.let { field ->
             val listRoots = mutableSetOf<List<String>>()
             valueList(field.value).forEach { reference ->
-                val path = reference.split('.').map(::normalize)
-                val entryIndexes = path.indices.filter { path[it] == "vr_entry" }
-                if (entryIndexes.size != 1) {
-                    state.error(field.valueRange, "Index key paths must pass through exactly one SectionList vr_entry")
+                val relativePath = reference.split('.').map(::normalize)
+                val resolved = resolveIndexPath(state, semanticVrPath(section.path.dropLast(1)), relativePath)
+                if (resolved == null) {
+                    state.error(field.valueRange, "Index key path must reference a value below exactly one SectionList vr_entry")
                     return@forEach
                 }
-                val listPath = path.take(entryIndexes.single())
-                listRoots += listPath
-                val listType = state.sections.find { it.path == listPath }?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
-                if (listType !in SECTION_LIST_TYPES) state.error(field.valueRange, "Index key path must reference a SectionList")
-                val targetType = state.sections.find { it.path == path }?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
-                if (targetType !in setOf("integer", "text")) state.error(field.valueRange, "Indexed values must use type Integer or Text")
+                listRoots += resolved.first
+                val targetType = findSection(state, resolved.second)?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
+                if (targetType !in setOf("integer", "text")) {
+                    state.error(field.valueRange, "Indexed values must use type Integer or Text")
+                }
             }
             if (listRoots.size > 1) state.error(field.valueRange, "All values in a composite index must reference the same SectionList")
         }
     }
+
+    /** Returns the addressed SectionList and canonical target path, accepting the legacy omitted-entry shorthand. */
+    private fun resolveIndexPath(
+        state: AnalysisState,
+        scope: List<String>,
+        relativePath: List<String>,
+    ): Pair<List<String>, List<String>>? {
+        val entryIndexes = relativePath.indices.filter { relativePath[it] == "vr_entry" }
+        if (entryIndexes.size > 1) return null
+        if (entryIndexes.size == 1) {
+            val entryIndex = entryIndexes.single()
+            if (entryIndex == 0 || entryIndex == relativePath.lastIndex) return null
+            val listPath = scope + relativePath.take(entryIndex)
+            val targetPath = scope + relativePath
+            return if (sectionType(state, listPath) in SECTION_LIST_TYPES && findSection(state, targetPath) != null) {
+                listPath to targetPath
+            } else null
+        }
+
+        // Compatibility form: list.value -> list.vr_entry.value.
+        for (insertion in 1 until relativePath.size) {
+            val listPath = scope + relativePath.take(insertion)
+            if (sectionType(state, listPath) !in SECTION_LIST_TYPES) continue
+            val targetPath = scope + relativePath.take(insertion) + "vr_entry" + relativePath.drop(insertion)
+            if (findSection(state, targetPath) != null) return listPath to targetPath
+        }
+        return null
+    }
+
+    private fun findSection(state: AnalysisState, semanticPath: List<String>): RuleSection? =
+        state.sections.find { semanticVrPath(it.path) == semanticPath }
+
+    private fun sectionType(state: AnalysisState, semanticPath: List<String>): String? =
+        findSection(state, semanticPath)?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
 
     private companion object {
         val VALUE_COLLECTION_TYPES = setOf("value_list", "valuelist", "value_matrix", "valuematrix")

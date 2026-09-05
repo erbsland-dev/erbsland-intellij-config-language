@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.5.0
+
+- Resolve validation-rule index paths relative to their `vr_key` scope, support canonical and compatibility entry paths, and honor scoped index visibility.
+- Highlight all unescaped `vr_` reserved names while treating `vr_vr_` names as escaped regular identifiers.
+- Add context-sensitive validation-rule completion for reserved names, fields, types, modes, templates, booleans, key paths, and named indexes, including unfinished text values.
+- Add separate, automatically detectable code-style preferences for section names, value names, and semantic identifiers in all lower/title/upper and space/underscore forms.
+- Expand the color preview with a clearly separated validation-rules example containing reserved names and identifiers.
+
 ## Version 0.4.1
 
 - Fix the changelog displayed in the IDE's plugin update details.

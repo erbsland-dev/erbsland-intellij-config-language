@@ -7,11 +7,12 @@ PyCharm, IntelliJ IDEA, and other IntelliJ Platform IDEs.
 
 - Syntax highlighting for `.elcl` files, including escapes, multiline tags, and visually distinct whitespace that ELCL discards from multiline values.
 - ELCL syntax and semantic diagnostics.
-- ELCL-VR highlighting, completion, and rule-document diagnostics for `.vr.elcl` files.
+- ELCL-VR highlighting, scoped diagnostics, and context-sensitive completion for `.vr.elcl` files.
 - Local `@include` resolution inside the current project.
 - Comment toggling, brace matching, folding, and a declaration-ordered semantic Structure view.
 - Language injection for tagged multiline code when the requested language is available in the IDE.
 - Logically grouped, configurable colors under **Editor | Color Scheme | Erbsland Configuration Language**.
+- Formatter-ready naming preferences under **Editor | Code Style | Erbsland Configuration Language**, with independent automatic detection for section names, value names, and semantic identifiers.
 
 The plugin validates `.vr.elcl` rule documents themselves. It does not yet apply validation rules to ordinary
 configuration files.

@@ -5,6 +5,8 @@ import com.intellij.lexer.LexerBase
 import com.intellij.psi.tree.IElementType
 import dev.erbsland.elcl.lexer.ElclLexerAdapter
 import dev.erbsland.elcl.psi.ElclTypes
+import dev.erbsland.elcl.validation.isReservedVrName
+import dev.erbsland.elcl.validation.normalize
 
 /** Adds context-sensitive token categories without changing parser tokens. */
 internal class ElclHighlightTokenClassifier(private val validationRules: Boolean) : LexerBase() {
@@ -23,6 +25,10 @@ internal class ElclHighlightTokenClassifier(private val validationRules: Boolean
     override fun getTokenType(): IElementType? {
         val type = delegate.tokenType ?: return null
         val sectionHeader = lineText().matches(SECTION_HEADER_LINE)
+        val text = delegate.bufferSequence.subSequence(delegate.tokenStart, delegate.tokenEnd).toString()
+        if (validationRules && type == ElclTypes.NAME && isReservedVrName(text)) {
+            return ElclHighlightTokenTypes.VR_RESERVED
+        }
         if (sectionHeader) {
             if (lineText().matches(SECTION_LIST_LINE) && type in SECTION_DELIMITER_TOKENS) {
                 return ElclHighlightTokenTypes.SECTION_LIST_DELIMITER
@@ -31,10 +37,9 @@ internal class ElclHighlightTokenClassifier(private val validationRules: Boolean
             if (type == ElclTypes.NAME) return ElclHighlightTokenTypes.SECTION_NAME
         }
         if (!validationRules) return type
-        val text = delegate.bufferSequence.subSequence(delegate.tokenStart, delegate.tokenEnd).toString()
-        val normalized = text.trim('"').lowercase().replace(' ', '_')
+        val normalized = normalize(text)
         return when {
-            type == ElclTypes.NAME && normalized.startsWith("vr_") -> ElclHighlightTokenTypes.VR_RESERVED
+            type == ElclTypes.NAME && isReservedVrName(normalized) -> ElclHighlightTokenTypes.VR_RESERVED
             type == ElclTypes.NAME && normalized in VR_FIELDS -> ElclHighlightTokenTypes.VR_FIELD
             type == ElclTypes.TEXT && normalized in VR_TYPES -> ElclHighlightTokenTypes.VR_TYPE
             else -> type

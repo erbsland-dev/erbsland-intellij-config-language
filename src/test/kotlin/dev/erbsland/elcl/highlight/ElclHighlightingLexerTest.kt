@@ -96,10 +96,22 @@ class ElclHighlightingLexerTest {
         assertTrue(page.demoText.contains("```kotlin"))
         assertTrue(page.demoText.contains("Inline Code"))
         assertTrue(page.demoText.contains("???"))
+        assertTrue(page.demoText.contains("VR Entry"))
+        assertTrue(page.demoText.contains("VR Key"))
     }
 
-    private fun lex(text: String): List<Token> {
-        val lexer = ElclHighlightingLexer(false)
+    @Test
+    fun `validation rules reserve vr names but not their escaped forms`() {
+        val tokens = lex("[App.VR Entry]\n*[App.VR Key]*\n[App.VR Headset]\n[App.VR VR Headset]\nVR VR Value: 1\n", true)
+        val reserved = tokens.filter { it.type == ElclHighlightingLexer.VR_RESERVED }.map { it.text }
+
+        assertEquals(listOf("VR Entry", "VR Key", "VR Headset"), reserved)
+        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.first { it.text == "VR VR Headset" }.type)
+        assertEquals(ElclTypes.NAME, tokens.first { it.text == "VR VR Value" }.type)
+    }
+
+    private fun lex(text: String, validationRules: Boolean = false): List<Token> {
+        val lexer = ElclHighlightingLexer(validationRules)
         lexer.start(text)
         return buildList {
             while (lexer.tokenType != null) {

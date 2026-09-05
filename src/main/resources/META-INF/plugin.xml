@@ -15,14 +15,13 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>Version 0.4.1</h3>
+        <h3>Version 0.5.0</h3>
         <ul>
-            <li>Fix the changelog displayed in the IDE's plugin update details.</li>
-            <li>Add a semantic, source-ordered Structure view with indexed section-list entries and live updates while editing.</li>
-            <li>Correct multiline parsing, comments, indentation highlighting, and tagged code-language injection.</li>
-            <li>Group color settings and add colors for section syntax, escapes, tags, and ignored multiline whitespace.</li>
-            <li>Improve byte-data and text-escape parsing with precise diagnostics for invalid formats, splits, characters, and Unicode code points.</li>
-            <li>Expand the color preview and reorganize the implementation into focused, documented components.</li>
+            <li>Correct scoped <code>vr_key</code> path and named-index resolution.</li>
+            <li>Highlight reserved validation-rule names, including readable space-separated forms, while honoring <code>vr_vr_</code> escapes.</li>
+            <li>Add context-sensitive completion for validation-rule fields, identifiers, key paths, and indexes, including unfinished text values.</li>
+            <li>Add formatter-ready code-style preferences with automatic style detection for section names, value names, and semantic identifiers.</li>
+            <li>Expand the color preview with a clearly separated validation-rules example.</li>
         </ul>
     ]]></change-notes>
 
@@ -37,6 +36,7 @@
         <lang.parserDefinition language="ELCL" implementationClass="dev.erbsland.elcl.ElclParserDefinition"/>
         <lang.syntaxHighlighterFactory language="ELCL" implementationClass="dev.erbsland.elcl.highlight.ElclSyntaxHighlighterFactory"/>
         <colorSettingsPage implementation="dev.erbsland.elcl.highlight.ElclColorSettingsPage"/>
+        <codeStyleSettingsProvider implementation="dev.erbsland.elcl.style.ElclCodeStyleSettingsProvider"/>
         <lang.commenter language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclCommenter"/>
         <lang.braceMatcher language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclBraceMatcher"/>
         <lang.foldingBuilder language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclFoldingBuilder"/>

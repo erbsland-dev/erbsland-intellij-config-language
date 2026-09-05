@@ -13,10 +13,14 @@ internal class ElclDocumentAnalyzer(
 ) {
     /** Parses [text], optionally runs ELCL-VR checks, and returns de-duplicated findings. */
     fun analyze(text: String, validationRules: Boolean, source: Path? = null): List<ElclDiagnostic> {
-        val state = AnalysisState(text)
-        parseDocument(state, source, 0, linkedSetOf())
+        val state = buildModel(text, source)
         if (validationRules) ElclValidationRulesAnalyzer().validate(state)
         return state.diagnostics.distinctBy { Triple(it.range, it.message, it.severity) }
+    }
+
+    /** Builds the recoverable section model used by editor features while a document is incomplete. */
+    internal fun buildModel(text: String, source: Path? = null): AnalysisState = AnalysisState(text).also {
+        parseDocument(it, source, 0, linkedSetOf())
     }
 
     private fun parseDocument(

@@ -77,10 +77,18 @@ class ElclColorSettingsPage : ColorSettingsPage {
 
             Broken Value: ???
 
-            [server.port]
-            type: "integer"
-            minimum: 1
-            maximum: 65535
+            # ELCL-VR syntax highlighting preview
+            [Server . Interface]
+            Type: "Section List"
+
+            [Server . Interface . VR Entry . Name]
+            Type: "Text"
+            Minimum: 1
+            Maximum: 32
+
+            *[Server . VR Key]*
+            Name: "Interface Name"
+            Key: "Interface.VR Entry.Name"
         """.trimIndent().replace("<triple>", "\"\"\"")
     }
 }
