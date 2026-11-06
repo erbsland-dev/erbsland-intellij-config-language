@@ -1,0 +1,18 @@
+[Elcl Format.Base]
+Maximum Line Length:50
+Value Wrapping:"keep"
+[.Vector]
+Style:"multiline"
+Spaces After Star:2
+[.Separator]
+Character:"="
+Position Mode:"spaces"
+Position:1
+Value Position Mode:"column"
+Value Position:25
+[.Section]
+Indent:0
+Suffix:0
+Space After Open:no
+Space Before Close:no
+Space Around Dot:no

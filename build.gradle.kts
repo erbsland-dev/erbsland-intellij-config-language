@@ -4,8 +4,8 @@ import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
     kotlin("jvm") version "2.1.20"
-    id("org.jetbrains.intellij.platform") version "2.18.1"
-    id("org.jetbrains.intellij.platform.grammarkit") version "2.18.1"
+    id("org.jetbrains.intellij.platform") version "2.20.0"
+    id("org.jetbrains.intellij.platform.grammarkit") version "2.20.0"
 }
 
 group = "dev.erbsland"
@@ -23,7 +23,14 @@ val versionFromGitTag = providers.exec {
     }
     normalized
 }
-version = versionFromGitTag.zip(fallbackPluginVersion) { tagged, fallback -> tagged.ifEmpty { fallback } }.get()
+version = providers.gradleProperty("pluginVersion")
+    .orElse(versionFromGitTag.zip(fallbackPluginVersion) { tagged, fallback -> tagged.ifEmpty { fallback } })
+    .map { selected ->
+        require(selected.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?"))) {
+            "Plugin version '$selected' is not a supported semantic version (expected 1.2.3)"
+        }
+        selected
+    }.get()
 
 repositories {
     mavenCentral()

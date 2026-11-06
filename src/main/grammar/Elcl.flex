@@ -18,6 +18,8 @@ import dev.erbsland.elcl.psi.ElclTypes;
 
 %state SECTION
 %state VALUE
+%state VALUE_START
+%state CONTINUATION
 %state MULTI_TEXT_HEADER
 %state MULTI_CODE_HEADER
 %state MULTI_REGEX_HEADER
@@ -71,7 +73,7 @@ FORMAT_ID=[a-zA-Z][-_a-zA-Z0-9]{0,15}
     {REGEX}                   { return ElclTypes.REGEX; }
     {BYTES}                   { return ElclTypes.BYTES; }
     {NAME}                    { return ElclTypes.NAME; }
-    [: =]                     { yybegin(VALUE); return ElclTypes.ASSIGN; }
+    [:=]                      { yybegin(VALUE_START); return ElclTypes.ASSIGN; }
     ","                       { return ElclTypes.COMMA; }
     "*"                       { yybegin(VALUE); return ElclTypes.LIST_MARKER; }
     "."                       { return ElclTypes.DOT; }
@@ -85,6 +87,19 @@ FORMAT_ID=[a-zA-Z][-_a-zA-Z0-9]{0,15}
     "]*"                      { yybegin(YYINITIAL); return ElclTypes.SECTION_LIST_CLOSE; }
     "]"                       { yybegin(YYINITIAL); return ElclTypes.SECTION_MAP_CLOSE; }
     {CRLF}                    { yybegin(YYINITIAL); return ElclTypes.LINE_BREAK; }
+}
+
+/* These states encode pending continuation in the restartable lexer state. */
+<VALUE_START> {
+    {SPACE}                   { return TokenType.WHITE_SPACE; }
+    {COMMENT}                 { return ElclTypes.COMMENT; }
+    {CRLF}                    { yybegin(CONTINUATION); return ElclTypes.LINE_BREAK; }
+    [^]                       { yypushback(yylength()); yybegin(VALUE); }
+}
+
+<CONTINUATION> {
+    [ \t]+                   { yybegin(VALUE); return TokenType.WHITE_SPACE; }
+    [^]                       { yypushback(yylength()); yybegin(YYINITIAL); }
 }
 
 <VALUE> {

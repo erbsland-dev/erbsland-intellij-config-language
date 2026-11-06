@@ -11,6 +11,7 @@ internal class ElclMultilineFragmentLexer(
     private val whitespaceMap: ElclMultilineWhitespaceMap,
     private val contentType: IElementType,
     private val highlightEscapes: Boolean = false,
+    private val placeholders: ElclPlaceholderMap? = null,
 ) : LexerBase() {
     private lateinit var buffer: CharSequence
     private var endOffset = 0
@@ -54,6 +55,13 @@ internal class ElclMultilineFragmentLexer(
             tokenEnd = tokenStart + escapeLength
             return
         }
+        placeholders?.containing(tokenStart)?.let {
+            tokenType = it.type
+            tokenEnd = minOf(it.end, endOffset)
+            val escape = (tokenStart + 1 until tokenEnd).firstOrNull { ElclTextEscapeLexer.escapeLengthAt(buffer, it, tokenEnd) != null }
+            if (escape != null) tokenEnd = escape
+            return
+        }
         tokenType = contentType
         val nextWhitespace = whitespaceMap.nextStart(tokenStart, endOffset)
         val nextEscape = if (highlightEscapes) {
@@ -63,6 +71,6 @@ internal class ElclMultilineFragmentLexer(
         } else {
             endOffset
         }
-        tokenEnd = minOf(nextWhitespace, nextEscape, endOffset)
+        tokenEnd = minOf(nextWhitespace, nextEscape, endOffset, placeholders?.nextStart(tokenStart + 1, endOffset) ?: endOffset)
     }
 }

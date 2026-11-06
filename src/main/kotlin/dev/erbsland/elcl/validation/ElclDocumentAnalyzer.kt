@@ -1,6 +1,10 @@
 package dev.erbsland.elcl.validation
 
 import com.intellij.openapi.util.TextRange
+import dev.erbsland.elcl.syntax.decodeElclText
+import dev.erbsland.elcl.syntax.nameKey
+import dev.erbsland.elcl.syntax.splitElclPath
+import dev.erbsland.elcl.syntax.elclLines
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,18 +41,22 @@ internal class ElclDocumentAnalyzer(
         var multiline: Multiline? = null
         var expectsContinuation = false
         var continuationIndent: String? = null
-        val lines = state.text.lineSequence().toList()
+        val lines = elclLines(state.text)
         val valueValidator = ElclValueValidator(state)
-        var offset = 0
+        var consumedScalarLine = -1
+        var pendingRange: TextRange? = null
 
-        lines.forEachIndexed { lineIndex, rawLine ->
+        lines.forEachIndexed { lineIndex, sourceLine ->
+            val rawLine = sourceLine.text
+            val offset = sourceLine.start
             val lineRange = TextRange(offset, offset + rawLine.length)
             val indent = rawLine.takeWhile { it == ' ' || it == '\t' }
             val significant = stripComment(rawLine).trim()
-            if (rawLine.toByteArray(Charsets.UTF_8).size > 4000) {
+            if (rawLine.toByteArray(Charsets.UTF_8).size + sourceLine.newline.length > 4000) {
                 state.error(lineRange, "Line exceeds the ELCL limit of 4000 UTF-8 bytes")
             }
 
+            if (lineIndex == consumedScalarLine) return@forEachIndexed
             if (multiline != null) {
                 val active = multiline!!
                 val content = rawLine.substring(indent.length)
@@ -77,18 +85,22 @@ internal class ElclDocumentAnalyzer(
                 if (!isClosingLine || (requiredIndent != null && indent.startsWith(requiredIndent) && indent != requiredIndent)) {
                     valueValidator.validateMultilineContent(active, rawLine, lineRange)
                 }
-                offset += rawLine.length + if (lineIndex < lines.lastIndex) 1 else 0
                 return@forEachIndexed
             }
             if (significant.isEmpty()) {
-                offset += rawLine.length + if (lineIndex < lines.lastIndex) 1 else 0
+                if (expectsContinuation && continuationIndent == null) {
+                    state.error(pendingRange ?: lineRange, "A value must immediately follow its separator")
+                }
+                expectsContinuation = false
+                continuationIndent = null
                 return@forEachIndexed
             }
 
-            if (expectsContinuation && significant.startsWith('*')) {
+            if (expectsContinuation && significant.startsWith('*') && !significant.startsWith("*[")) {
+                if (indent.isEmpty()) state.error(lineRange, "A value placed on the line after its separator must be indented")
+                valueValidator.validate(significant.removePrefix("*").trim(), lineRange)
                 if (continuationIndent == null) continuationIndent = indent
                 else if (continuationIndent != indent) state.error(lineRange, "All rows of a multiline list or matrix must use the same indentation")
-                offset += rawLine.length + if (lineIndex < lines.lastIndex) 1 else 0
                 return@forEachIndexed
             }
             val significantStart = rawLine.indexOf(significant).coerceAtLeast(0)
@@ -101,8 +113,10 @@ internal class ElclDocumentAnalyzer(
                 multiline = Multiline(indent, continuedOpening)
                 expectsContinuation = false
                 continuationIndent = null
-                offset += rawLine.length + if (lineIndex < lines.lastIndex) 1 else 0
                 return@forEachIndexed
+            }
+            if (expectsContinuation && continuationIndent == null) {
+                state.error(pendingRange ?: lineRange, "Expected an indented value immediately after the separator")
             }
             expectsContinuation = false
             continuationIndent = null
@@ -115,7 +129,7 @@ internal class ElclDocumentAnalyzer(
                 val relative = rawPath.startsWith('.')
                 val elements = splitPath(rawPath.removePrefix("."), lineRange, state)
                 if (elements.size > 10) state.error(section.range, "Section paths are limited to 10 name elements")
-                val normalized = elements.map(::normalize)
+                val normalized = elements.map { runCatching { nameKey(it) }.getOrDefault(it) }
                 if (relative) {
                     if (lastAbsolute == null || afterInclude) {
                         state.error(section.range, "A relative section requires a preceding absolute section in this document")
@@ -130,11 +144,22 @@ internal class ElclDocumentAnalyzer(
                 currentScope = state.namespace.openSection(currentPath!!, section.list)
                 if (currentScope == null) state.error(section.range, "Duplicate or conflicting section path '$key'")
                 state.sections += RuleSection(currentPath!!, section.list, section.range, significant)
-                offset += rawLine.length + if (lineIndex < lines.lastIndex) 1 else 0
                 return@forEachIndexed
             }
 
-            val assignment = parseAssignment(significant, lineRange)
+            var assignment = parseAssignment(significant, significantRange)
+            if (assignment != null && assignment.value.isEmpty()) {
+                val next = lines.getOrNull(lineIndex + 1)
+                if (next != null && next.indent.isNotEmpty()) {
+                    val value = stripComment(next.text).trim()
+                    if (value.isNotEmpty() && !value.startsWith('*') && MULTILINE_OPENERS.none { value.startsWith(it) }) {
+                        val valueStart = next.start + next.text.indexOf(value)
+                        assignment = assignment.copy(value = value, valueRange = TextRange(valueStart, valueStart + value.length))
+                        consumedScalarLine = lineIndex + 1
+                        valueValidator.validate(value, assignment.valueRange)
+                    }
+                }
+            }
             if (assignment == null) {
                 state.error(lineRange, "Expected a section, meta command, or name-value assignment")
             } else if (assignment.name.startsWith('@')) {
@@ -157,12 +182,12 @@ internal class ElclDocumentAnalyzer(
                     else -> state.error(assignment.nameRange, "Unknown ELCL meta name '@$meta'")
                 }
             } else {
-                val name = normalize(assignment.name)
+                val name = runCatching { nameKey(assignment.name) }.getOrDefault(assignment.name)
                 validateName(assignment.name, assignment.nameRange, state)
                 if (currentPath == null) state.error(assignment.nameRange, "Values must be placed inside a section")
                 val fullPath = (currentPath.orEmpty() + name).joinToString(".")
                 if (currentScope != null && !currentScope!!.defineValue(name)) {
-                    state.error(assignment.nameRange, "Duplicate or normalized name conflict at '$fullPath'")
+                    state.error(assignment.nameRange, "Duplicate or conflicting name (regular and text names cannot be mixed) at '$fullPath'")
                 }
                 val opening = valueValidator.validate(assignment.value, assignment.valueRange)
                 state.sections.lastOrNull()?.fields?.put(name, RuleField(name, assignment.value, assignment.nameRange, assignment.valueRange))?.let {
@@ -170,10 +195,13 @@ internal class ElclDocumentAnalyzer(
                 }
                 // With an inline opener, the first non-empty continued line establishes indentation.
                 if (opening != null) multiline = Multiline(null, opening)
-                if (assignment.value.isEmpty()) expectsContinuation = true
+                if (assignment.value.isEmpty()) {
+                    expectsContinuation = true
+                    pendingRange = assignment.nameRange
+                }
             }
-            offset += rawLine.length + if (lineIndex < lines.lastIndex) 1 else 0
         }
+        if (expectsContinuation && continuationIndent == null) state.error(pendingRange ?: TextRange(0, 0), "Missing assignment value")
         if (multiline != null) state.error(TextRange(state.text.length.coerceAtLeast(1) - 1, state.text.length), "Unterminated multiline value")
     }
 
@@ -290,29 +318,29 @@ internal class ElclDocumentAnalyzer(
     }
 
     private fun splitPath(path: String, range: TextRange, state: AnalysisState): List<String> {
-        val result = mutableListOf<String>()
-        var quote = false
-        var start = 0
-        path.forEachIndexed { index, char ->
-            if (char == '"') quote = !quote
-            if (char == '.' && !quote) {
-                result += path.substring(start, index).trim().trim('"')
-                start = index + 1
-            }
+        val result = runCatching { splitElclPath(path) }.getOrElse {
+            state.error(range, it.message ?: "Invalid name path")
+            return emptyList()
         }
-        result += path.substring(start).trim().trim('"')
         if (result.any { it.isEmpty() }) state.error(range, "Name paths cannot contain empty elements")
         result.forEach { validateName(it, range, state) }
         return result
     }
 
     private fun validateName(name: String, range: TextRange, state: AnalysisState) {
-        val plain = name.trim().trim('"')
-        if (plain.length > 100) state.error(range, "Names are limited to 100 characters")
+        val plain = name.trim()
+        if (plain.startsWith('"')) {
+            ElclValueValidator(state).validate(plain, range)
+            val decoded = runCatching { decodeElclText(plain.removeSurrounding("\"")) }.getOrNull()
+            if (decoded.isNullOrEmpty()) state.error(range, "Text names must be nonempty valid text")
+            return
+        }
+        if (plain.codePointCount(0, plain.length) > 100) state.error(range, "Names are limited to 100 characters")
         if (plain.isEmpty() || !plain.first().isLetter() || plain.any { !(it.isLetterOrDigit() || it == ' ' || it == '_') }) {
             state.error(range, "Regular names use letters, digits, spaces, and underscores and must start with a letter")
         }
         if (plain.contains("  ") || plain.contains("__") || plain.contains(" _") || plain.contains("_ ")) state.error(range, "Name separators cannot be repeated or mixed")
+        if (plain.endsWith('_')) state.error(range, "Regular names cannot end with an underscore")
     }
 
     private fun stripComment(line: String): String {

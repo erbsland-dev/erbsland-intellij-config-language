@@ -1,0 +1,3 @@
+# A quoted filename may contain underscores and punctuation.
+[files]
+"sample_document.txt": "example text"

@@ -5,7 +5,7 @@ import com.intellij.psi.tree.IElementType
 import dev.erbsland.elcl.psi.ElclTypes
 
 /** Splits valid ELCL text escapes from the surrounding text for coloring. */
-internal class ElclTextEscapeLexer : LexerBase() {
+internal class ElclTextEscapeLexer(private val placeholders: ElclPlaceholderMap? = null) : LexerBase() {
     private lateinit var buffer: CharSequence
     private var endOffset = 0
     private var tokenStart = 0
@@ -43,10 +43,18 @@ internal class ElclTextEscapeLexer : LexerBase() {
             tokenEnd = tokenStart + escapeLength
             return
         }
+        placeholders?.containing(tokenStart)?.let {
+            tokenType = it.type
+            tokenEnd = minOf(it.end, endOffset)
+            val escape = (tokenStart + 1 until tokenEnd).firstOrNull { escapeLengthAt(buffer, it, tokenEnd) != null }
+            if (escape != null) tokenEnd = escape
+            return
+        }
         tokenType = ElclTypes.TEXT
         tokenEnd = (tokenStart + 1 until endOffset)
             .firstOrNull { escapeLengthAt(buffer, it, endOffset) != null }
             ?: endOffset
+        tokenEnd = minOf(tokenEnd, placeholders?.nextStart(tokenStart + 1, endOffset) ?: endOffset)
     }
 
     companion object {

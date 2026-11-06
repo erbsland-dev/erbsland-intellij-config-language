@@ -1,0 +1,11 @@
+[a]
+scalar: 42
+singleton:
+  * "one"
+vector: "long first value", "second value", "third value"
+comments:
+  * 1 # one
+  * 2 # two
+matrix:
+  * 1,  22 # row one
+  * 333,4 # row two

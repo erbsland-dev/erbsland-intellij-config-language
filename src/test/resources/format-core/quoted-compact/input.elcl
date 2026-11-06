@@ -1,0 +1,4 @@
+[files]
+"File.txt": "my_identifier"
+"file.txt": "${var:leave_me|trim}"
+"a\u002eb": "space identifier"

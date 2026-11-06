@@ -1,0 +1,7 @@
+[my_section]
+long_name: "1234567890" # note
+first: 1,2,3
+[.child]
+my_value:yes
+*[peers]
+name:"first"

@@ -1,0 +1,14 @@
+----[ Text Rewrite ]-------------------------------------------------------------
+Line Width                   : 80
+Input Directory              : "fixtures/input"
+Output Directory             : "fixtures/output"
+
+# Equivalent regex values on the assignment line and an indented continuation.
+-----*[ . Replacement Rule ]*---
+Pattern                      : /(?m)^(?<indent>[ \t]*)(?:example::)?Widget::start\(\*this\);/
+Replacement                  : "{indent}start();"
+
+-----*[ . Replacement Rule ]*---
+Pattern                      :
+    /(?m)^(?<indent>[ \t]*)(?:example::)?Widget::start\((?<target>[A-Za-z_]\w*)\);/
+Replacement                  : "{indent}{target}.start();"

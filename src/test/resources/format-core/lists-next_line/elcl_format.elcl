@@ -1,0 +1,16 @@
+[Elcl Format.Base]
+Value Wrapping:"next_line"
+[.Section]
+Indent:"infinite"
+Suffix:"infinite"
+Star:no
+[.Names]
+Section Case:"upper"
+Section Separator:"underscore"
+Value Case:"keep"
+Value Separator:"underscore"
+Text Name Case:"lower"
+Text Identifier Case:"upper"
+[.Indentation]
+Style:"tabs"
+Count:2

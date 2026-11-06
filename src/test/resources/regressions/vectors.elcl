@@ -1,0 +1,26 @@
+# Synthetic text values continued after an assignment line break.
+----[ Sample Catalog ]-----------------------------------------------------------
+Working Directory            : "fixtures/catalog"
+Item Limit                   : 128
+Retry Delay Seconds          : 3
+
+----[ Sample Catalog . Entries . First ]------------------------------------------
+Description                  :
+    "The first example has an indented text value followed by more assignments."
+Label                        : "First example"
+Note                         : ""
+Category                     : "test data"
+
+----[ Sample Catalog . Entries . Second ]-----------------------------------------
+Description                  :
+    "The second example checks the same continuation syntax in another section."
+Label                        : "Second example"
+Note                         : ""
+Category                     : "test data"
+
+----[ Sample Catalog . Entries . Third ]------------------------------------------
+Description                  :
+    "The third example confirms that later sections and assignments stay separate."
+Label                        : "Third example"
+Note                         : ""
+Category                     : "test data"

@@ -27,6 +27,9 @@ class ElclSyntaxHighlighter(private val validationRules: Boolean = false) : Synt
             ElclTypes.INTEGER, ElclTypes.FLOAT -> ElclTextAttributes.NUMBER
             ElclTypes.BOOLEAN -> ElclTextAttributes.BOOLEAN
             ElclTypes.TEXT, ElclTypes.MULTILINE_TEXT_CONTENT -> ElclTextAttributes.STRING
+            ElclHighlightTokenTypes.PLACEHOLDER_TYPE -> ElclTextAttributes.PLACEHOLDER_TYPE
+            ElclHighlightTokenTypes.PLACEHOLDER_PARAMETER -> ElclTextAttributes.PLACEHOLDER_PARAMETER
+            ElclHighlightTokenTypes.PLACEHOLDER_DELIMITER -> ElclTextAttributes.PLACEHOLDER_DELIMITER
             ElclHighlightingLexer.TEXT_ESCAPE -> ElclTextAttributes.ESCAPE
             ElclTypes.CODE, ElclTypes.MULTILINE_CODE_CONTENT -> ElclTextAttributes.CODE
             ElclTypes.REGEX, ElclTypes.MULTILINE_REGEX_CONTENT -> ElclTextAttributes.REGEX

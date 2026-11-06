@@ -35,6 +35,9 @@ class ElclColorSettingsPage : ColorSettingsPage {
             AttributesDescriptor("Values//Number", ElclTextAttributes.NUMBER),
             AttributesDescriptor("Values//Boolean", ElclTextAttributes.BOOLEAN),
             AttributesDescriptor("Values//Text", ElclTextAttributes.STRING),
+            AttributesDescriptor("Placeholders//Source and filter names", ElclTextAttributes.PLACEHOLDER_TYPE),
+            AttributesDescriptor("Placeholders//Parameters", ElclTextAttributes.PLACEHOLDER_PARAMETER),
+            AttributesDescriptor("Placeholders//Delimiters", ElclTextAttributes.PLACEHOLDER_DELIMITER),
             AttributesDescriptor("Values//Escape sequence", ElclTextAttributes.ESCAPE),
             AttributesDescriptor("Values//Code", ElclTextAttributes.CODE),
             AttributesDescriptor("Values//Regular expression", ElclTextAttributes.REGEX),
@@ -55,6 +58,7 @@ class ElclColorSettingsPage : ColorSettingsPage {
 
             --------[ Server . "Main instance" ]--------------------
             "Display name": "Example\NServer \U{1f642}"
+            Welcome: "Hello ${'$'}{var:user|trim|fallback:Guest}"
             Enabled: yes
             Port: 8080
             Ports: 8080, 8081
@@ -72,7 +76,7 @@ class ElclColorSettingsPage : ColorSettingsPage {
             Name: "Backup"
 
             Message: <triple>
-                A multiline value.
+                A multiline value for ${'$'}{env:USER|trim}.
                 <triple>
 
             Broken Value: ???

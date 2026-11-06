@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 0.6.2
+
+- Fix: Accept quoted text names with punctuation and preserve their decoded, case-sensitive identity in validation and namespace checks.
+- Fix: Parse indented next-line scalar values and lists as part of their assignment; improve continuation recovery and CRLF diagnostic ranges.
+- Add optional IDE-wide placeholder highlighting, enabled by default, with separate source/filter, parameter, and punctuation colors and no runtime resolution or placeholder diagnostics.
+- Implement built-in Reformat Code support for Core's style options, wrapping, section decorations, vector/matrix layouts, naming, selector specificity, and lossless recovery around damaged statements.
+- Add all formatting controls and live previews to Code Style settings, preserving independent completion preferences.
+- Optional discover `elcl_format.elcl` files with Core defaults, ordered selector rules, local includes, and support for unsaved configuration edits.
+- Update the IntelliJ Platform and Grammar-Kit Gradle plugins to 2.20.0, retaining the 2025.2 minimum IDE version.
+- Redesign Code Style settings with a single level of Layout, Names, Sections, Lists, and Completion tabs, padded groups, descriptive choices, and side-by-side syntax-highlighted examples.
+- Focused live previews for wrapping, indentation, naming, section decoration, list layout, matrix alignment, and completion spelling.
+
 ## Version 0.5.0
 
 - Resolve validation-rule index paths relative to their `vr_key` scope, support canonical and compatibility entry paths, and honor scoped index visibility.

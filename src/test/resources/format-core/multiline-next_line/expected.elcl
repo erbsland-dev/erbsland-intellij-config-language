@@ -1,0 +1,15 @@
+-------------------------------------------------------[ DATA ]-------------------------------------------------------
+text                         : """ # header
+		hello  
+		  relative
+		""" # close
+code                         :
+		```kotlin # language
+		println("hello")
+		```
+regex                        : ///
+		[a-z]+  # comment
+		///
+bytes                        : <<<hex
+		01 02  # bytes
+		>>>

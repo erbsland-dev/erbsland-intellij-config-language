@@ -67,9 +67,9 @@ assignment ::= assignment_name ASSIGN assignment_value?
 meta_assignment ::= META_NAME ASSIGN assignment_value?
 private assignment_name ::= NAME | TEXT_NAME
 
-private assignment_value ::= scalar_list | multiline_value | LINE_BREAK (multiline_value | list_row+)
+private assignment_value ::= scalar_list | multiline_value | LINE_BREAK (multiline_value | list_row (LINE_BREAK list_row)* | scalar_list)
 scalar_list ::= scalar (COMMA scalar)*
-private scalar ::= INTEGER | FLOAT | BOOLEAN | TEXT | TEXT_NAME | CODE | REGEX | BYTES | DATE | TIME | DATE_TIME | TIME_DELTA
+private scalar ::= INTEGER | FLOAT | BOOLEAN | TEXT | CODE | REGEX | BYTES | DATE | TIME | DATE_TIME | TIME_DELTA
 list_row ::= LIST_MARKER scalar_list
 
 multiline_value ::= multiline_text | multiline_code | multiline_regex | multiline_bytes

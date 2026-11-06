@@ -1,0 +1,3 @@
+These golden outputs were captured from the Erbsland Core elcl-format command using synthetic inputs. Inputs, complete configuration files, and expected output are self-contained. Tests never execute Core. Files intentionally retain CRLF, mixed indentation, trailing spaces, and missing final newlines where relevant.
+
+Known difference: the recorded Core formatter adds another space before comments in multiline regex and byte bodies on every pass (confirmed by running it twice). The Kotlin formatter retains the original spacing. The golden test explicitly adjusts these two captured lines in the multiline cases; the original Core output is retained here for review. All other output is compared verbatim, and every case is checked for idempotence.

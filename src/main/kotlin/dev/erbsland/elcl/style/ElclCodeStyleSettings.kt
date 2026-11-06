@@ -5,6 +5,10 @@ import com.intellij.psi.codeStyle.CustomCodeStyleSettings
 
 /** Persisted, formatter-ready ELCL naming preferences. */
 class ElclCodeStyleSettings(container: CodeStyleSettings) : CustomCodeStyleSettings("ElclCodeStyleSettings", container) {
+    @JvmField var FORMAT_STYLE: String = ""
+    @JvmField var FORMAT_DETECT_SECTION_NAMES: Boolean = false
+    @JvmField var FORMAT_DETECT_VALUE_NAMES: Boolean = false
+    @JvmField var FORMAT_DETECT_IDENTIFIERS: Boolean = false
     @JvmField var SECTION_NAME_STYLE: String = ElclNameStyle.TITLE_SPACE.name
     @JvmField var DETECT_SECTION_NAME_STYLE: Boolean = true
     @JvmField var VALUE_NAME_STYLE: String = ElclNameStyle.TITLE_SPACE.name

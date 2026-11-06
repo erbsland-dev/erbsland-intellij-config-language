@@ -5,14 +5,15 @@ import com.intellij.psi.TokenType
 import dev.erbsland.elcl.psi.ElclTypes
 
 /** Lexer used by the editor to add contextual and escape-sequence colors. */
-class ElclHighlightingLexer(validationRules: Boolean) :
+class ElclHighlightingLexer(validationRules: Boolean, private val placeholdersEnabled: () -> Boolean = dev.erbsland.elcl.settings.ElclSettings::placeholdersEnabled) :
     LayeredLexer(ElclHighlightTokenClassifier(validationRules)) {
+    private val placeholderMap = ElclPlaceholderMap()
     private val whitespaceMap = ElclMultilineWhitespaceMap()
 
     init {
-        registerLayer(ElclTextEscapeLexer(), ElclTypes.TEXT)
+        registerLayer(ElclTextEscapeLexer(placeholderMap), ElclTypes.TEXT)
         registerLayer(
-            ElclMultilineFragmentLexer(whitespaceMap, ElclTypes.MULTILINE_TEXT_CONTENT, highlightEscapes = true),
+            ElclMultilineFragmentLexer(whitespaceMap, ElclTypes.MULTILINE_TEXT_CONTENT, highlightEscapes = true, placeholders = placeholderMap),
             ElclTypes.MULTILINE_TEXT_CONTENT,
         )
         listOf(
@@ -28,6 +29,7 @@ class ElclHighlightingLexer(validationRules: Boolean) :
     }
 
     override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
+        placeholderMap.prepare(buffer, placeholdersEnabled())
         whitespaceMap.prepare(buffer)
         super.start(buffer, startOffset, endOffset, initialState)
     }

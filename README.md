@@ -12,7 +12,11 @@ PyCharm, IntelliJ IDEA, and other IntelliJ Platform IDEs.
 - Comment toggling, brace matching, folding, and a declaration-ordered semantic Structure view.
 - Language injection for tagged multiline code when the requested language is available in the IDE.
 - Logically grouped, configurable colors under **Editor | Color Scheme | Erbsland Configuration Language**.
-- Formatter-ready naming preferences under **Editor | Code Style | Erbsland Configuration Language**, with independent automatic detection for section names, value names, and semantic identifiers.
+- Built-in Reformat Code support with focused style tabs and matching syntax-highlighted previews. Loading `elcl_format.elcl` configuration files and selector rules is optional and disabled by default.
+- Optional placeholder highlighting in text, with separate source/filter, parameter, and delimiter colors; enabled by default.
+- Independent completion naming preferences and optional formatter name-style detection under **Editor | Code Style | Erbsland Configuration Language**.
+
+See [formatting and placeholder settings](docs/formatting.md) for configuration, defaults, and examples.
 
 The plugin validates `.vr.elcl` rule documents themselves. It does not yet apply validation rules to ordinary
 configuration files.
@@ -32,7 +36,17 @@ The installable archive is written to `build/distributions/`.
 
 The build uses the nearest reachable Git tag as the plugin version. Release tags may be written as `1.2.3` or
 `v1.2.3`; the optional `v` prefix is removed before the version is written into the plugin descriptor and archive
-name. Tags must otherwise be valid semantic versions.
+name. Tags must otherwise be valid semantic versions. If no release tag is available, the build uses
+`pluginVersionFallback` from `gradle.properties`.
+
+To prepare and verify a release package before creating its Git tag, set an explicit version:
+
+```shell
+./gradlew -PpluginVersion=0.6.1 test buildPlugin verifyPlugin
+```
+
+The `pluginVersion` override takes precedence over Git tags and must be a semantic version without a `v`
+prefix. This command creates `build/distributions/erbsland-config-for-jetbrains-ide-0.6.1.zip`.
 
 ## Install
 
@@ -49,7 +63,7 @@ JetBrains IDE version 2025.2 or newer is required.
 ./gradlew verifyPlugin
 ```
 
-This verifies the plugin against IntelliJ IDEA Community releases from the 2025.2 and 2026.2 lines. The plugin only
+This verifies the plugin against IntelliJ IDEA Community 2025.2.6.2 and IntelliJ IDEA 2026.2.1. The plugin only
 uses the cross-product `com.intellij.modules.lang` API.
 
 ## Development

@@ -64,8 +64,11 @@ internal class NamespaceTree {
     /** Opens a map section or a fresh list entry, returning null on conflict. */
     fun openSection(path: List<String>, list: Boolean): NamespaceScope? {
         if (path.isEmpty()) return null
+        if (path.first().startsWith('"') || path.dropLast(1).any { it.startsWith('"') } ||
+            (list && path.last().startsWith('"'))) return null
         var scope = root
         path.dropLast(1).forEach { name ->
+            if (!scope.accepts(name)) return null
             scope = when (val existing = scope.children[name]) {
                 null -> NamespaceSection(explicit = false).also { scope.children[name] = it }.scope
                 is NamespaceSection -> existing.scope
@@ -75,6 +78,7 @@ internal class NamespaceTree {
         }
 
         val name = path.last()
+        if (!scope.accepts(name)) return null
         val existing = scope.children[name]
         if (list) {
             val sectionList = when (existing) {
@@ -110,6 +114,7 @@ internal class NamespaceTree {
             val path = parentPath + name
             val destinationNode = destination.children[name]
             if (destinationNode == null) {
+                if (!destination.accepts(name)) { conflicts += path.joinToString("."); return@forEach }
                 destination.children[name] = sourceNode.copyNode()
                 return@forEach
             }
@@ -136,7 +141,8 @@ internal class NamespaceTree {
 /** Namespace members directly declared in one section or list entry. */
 internal class NamespaceScope {
     val children = linkedMapOf<String, NamespaceNode>()
-    fun defineValue(name: String): Boolean = children.putIfAbsent(name, NamespaceValue) == null
+    fun accepts(name: String): Boolean = children.keys.firstOrNull()?.let { it.startsWith('"') == name.startsWith('"') } ?: true
+    fun defineValue(name: String): Boolean = accepts(name) && children.putIfAbsent(name, NamespaceValue) == null
     fun copyScope(): NamespaceScope = NamespaceScope().also { copy ->
         children.forEach { (name, node) -> copy.children[name] = node.copyNode() }
     }

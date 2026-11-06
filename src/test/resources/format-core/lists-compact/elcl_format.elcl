@@ -1,0 +1,6 @@
+[Elcl Format.Base]
+Maximum Line Length:40
+[.Vector]
+Style:"compact"
+[.Matrix]
+Style:"align"

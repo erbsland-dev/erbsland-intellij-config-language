@@ -1,0 +1,14 @@
+[A]
+Scalar =                 42
+Singleton =
+    *  "one"
+Vector =
+    *  "long first value"
+    *  "second value"
+    *  "third value"
+Comments =
+    *  1 # one
+    *  2 # two
+Matrix =
+    *  1,  22 # row one
+    *  333,4 # row two

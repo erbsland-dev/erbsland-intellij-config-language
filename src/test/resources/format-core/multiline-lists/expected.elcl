@@ -1,0 +1,15 @@
+[Data]
+Text =                   """ # header
+    hello  
+      relative
+    """ # close
+Code =
+    ```kotlin # language
+    println("hello")
+    ```
+Regex =                  ///
+    [a-z]+  # comment
+    ///
+Bytes =                  <<<hex
+    01 02  # bytes
+    >>>

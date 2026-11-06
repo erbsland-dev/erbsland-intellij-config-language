@@ -6,7 +6,7 @@
     <description><![CDATA[
         <p>Language support for the Erbsland Configuration Language.</p>
         <p>Provides syntax highlighting, parsing, diagnostics, ELCL-VR authoring support,
-        folding, structure view, commenting, and completion for <code>.elcl</code> files.</p>
+        folding, structure view, commenting, completion, optional placeholder highlighting, and Core-compatible formatting for <code>.elcl</code> files.</p>
         <p>
             <a href="https://config-lang.erbsland.dev/">Language reference</a> ·
             <a href="https://github.com/erbsland-dev/erbsland-intellij-config-language">Source code</a> ·
@@ -15,13 +15,16 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>Version 0.5.0</h3>
+        <h3>Version 0.6.2</h3>
         <ul>
-            <li>Correct scoped <code>vr_key</code> path and named-index resolution.</li>
-            <li>Highlight reserved validation-rule names, including readable space-separated forms, while honoring <code>vr_vr_</code> escapes.</li>
-            <li>Add context-sensitive completion for validation-rule fields, identifiers, key paths, and indexes, including unfinished text values.</li>
-            <li>Add formatter-ready code-style preferences with automatic style detection for section names, value names, and semantic identifiers.</li>
-            <li>Expand the color preview with a clearly separated validation-rules example.</li>
+            <li>Show matching, syntax-highlighted examples beside each group of settings, updating as options change.</li>
+            <li>Fix quoted text-name validation and next-line scalar values, including regex patterns and URLs.</li>
+            <li>Add optional Erbsland Core placeholder highlighting, enabled by default, with separate colors for source/filter names, parameters, and delimiters.</li>
+            <li>Add built-in Reformat Code support with all Core style options, configuration files, selector rules, and live settings previews.</li>
+            <li>Keep completion naming preferences independent of formatting settings.</li>
+            <li>Update the IntelliJ Platform and Grammar-Kit Gradle plugins to 2.20.0, retaining support for IDE version 2025.2 and newer.</li>
+            <li>Redesign settings with focused Layout, Names, Sections, Lists, and Completion tabs and padded controls.</li>
+            <li>Loading elcl_format.elcl and local includes (disabled by default).</li>
         </ul>
     ]]></change-notes>
 
@@ -35,7 +38,12 @@
                   fieldName="INSTANCE"/>
         <lang.parserDefinition language="ELCL" implementationClass="dev.erbsland.elcl.ElclParserDefinition"/>
         <lang.syntaxHighlighterFactory language="ELCL" implementationClass="dev.erbsland.elcl.highlight.ElclSyntaxHighlighterFactory"/>
+        <applicationConfigurable parentId="language" id="dev.erbsland.elcl.settings"
+                                 displayName="Erbsland Configuration Language"
+                                 instance="dev.erbsland.elcl.settings.ElclSettingsConfigurable"/>
         <colorSettingsPage implementation="dev.erbsland.elcl.highlight.ElclColorSettingsPage"/>
+        <formattingService implementation="dev.erbsland.elcl.format.ElclFormattingService"/>
+        <notificationGroup id="ELCL Formatting" displayType="BALLOON"/>
         <codeStyleSettingsProvider implementation="dev.erbsland.elcl.style.ElclCodeStyleSettingsProvider"/>
         <lang.commenter language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclCommenter"/>
         <lang.braceMatcher language="ELCL" implementationClass="dev.erbsland.elcl.editor.ElclBraceMatcher"/>
