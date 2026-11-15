@@ -42,11 +42,11 @@ name. Tags must otherwise be valid semantic versions. If no release tag is avail
 To prepare and verify a release package before creating its Git tag, set an explicit version:
 
 ```shell
-./gradlew -PpluginVersion=0.6.1 test buildPlugin verifyPlugin
+./gradlew -PpluginVersion=0.6.4 test buildPlugin verifyPlugin
 ```
 
 The `pluginVersion` override takes precedence over Git tags and must be a semantic version without a `v`
-prefix. This command creates `build/distributions/erbsland-config-for-jetbrains-ide-0.6.1.zip`.
+prefix. This command creates `build/distributions/erbsland-config-for-jetbrains-ide-0.6.4.zip`.
 
 ## Install
 

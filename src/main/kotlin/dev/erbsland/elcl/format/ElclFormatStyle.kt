@@ -12,6 +12,9 @@ internal enum class FormatProperty(val path: String, val label: String, val defa
     TEXT_NAME_SEPARATOR("names.text_name_separator", "Quoted name word separator", "space", separators()),
     TEXT_IDENTIFIER_CASE("names.text_identifier_case", "Text identifier case", "keep", cases()),
     TEXT_IDENTIFIER_SEPARATOR("names.text_identifier_separator", "Text identifier word separator", "space", separators()),
+    ABBREVIATIONS("names.abbreviations", "Uppercase abbreviations", "HTTP, HTTPS, FTP, FTPS, SSH, VR"),
+    BOOLEAN_CASE("boolean.case", "Boolean spelling", "title", cases()),
+    BOOLEAN_FORM("boolean.form", "Boolean form", "keep", listOf("keep", "true_false", "yes_no", "enabled_disabled", "on_off")),
     SECTION_INDENT("section.indent", "Opening bracket column (or infinite)", "4"),
     SECTION_SUFFIX("section.suffix", "Section suffix width (or infinite)", "infinite"),
     SECTION_STAR("section.star", "Closing section-list star", "true", booleans()),
@@ -30,6 +33,11 @@ internal enum class FormatProperty(val path: String, val label: String, val defa
     INDENT_COUNT("indentation.count", "Continuation indentation count", "4");
 
     fun validate(value: String): String {
+        if (this == ABBREVIATIONS) {
+            val words = value.split(Regex("[,\\s]+")).filter(String::isNotEmpty)
+            require(words.all { it.matches(Regex("[A-Za-z][A-Za-z0-9]*")) }) { "$label: expected words separated by commas or spaces" }
+            return words.map { it.uppercase(java.util.Locale.ROOT) }.distinct().joinToString(", ")
+        }
         val normalized = value.lowercase(java.util.Locale.ROOT).replace(' ', '_')
         if (choices.isNotEmpty()) require(normalized in choices) { "$label: expected ${choices.joinToString()}" }
         else if (this in listOf(SECTION_INDENT, SECTION_SUFFIX) && normalized == "infinite") return normalized
@@ -51,6 +59,8 @@ internal data class ElclFormatStyle(val properties: Map<FormatProperty, String> 
     operator fun get(key: FormatProperty): String = properties[key] ?: key.default
     fun number(key: FormatProperty): Int = if (get(key) == "infinite") -1 else get(key).toInt()
     fun enabled(key: FormatProperty): Boolean = get(key) == "true"
+    fun abbreviations(): Set<String> = FormatProperty.ABBREVIATIONS.validate(get(FormatProperty.ABBREVIATIONS))
+        .split(", ").filter(String::isNotEmpty).toSet()
     fun patched(patch: Map<FormatProperty, String>): ElclFormatStyle = copy(properties = properties + patch)
     fun validate() { FormatProperty.entries.forEach { it.validate(get(it)) } }
     fun serialize(): String = FormatProperty.entries.joinToString("\n") { "${it.path}=${get(it)}" }

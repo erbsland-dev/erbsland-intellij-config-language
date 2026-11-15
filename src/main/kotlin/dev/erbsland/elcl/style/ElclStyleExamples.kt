@@ -6,6 +6,7 @@ internal object ElclStyleExamples {
         [server]
         port:8080
         connection_timeout:30s
+        bool_literals: true, FALSE, yes, NO, enabled, DISABLED, on, OFF
         welcome_message:"Welcome to the example server. This message fits on a continuation line at the default width."
         long_message:"This deliberately long message demonstrates wrapping when a complete value is still too wide on its own continuation line; literals are never split."
         next_line:
@@ -22,6 +23,9 @@ internal object ElclStyleExamples {
         display_name: "primary_server"
         connection_type: "secure_socket"
         fallback_name: "backup_server"
+        http_port: 8080
+        ssh_enabled: yes
+        vr_name: "https_server"
 
         [client_settings]
         retry_count: 3

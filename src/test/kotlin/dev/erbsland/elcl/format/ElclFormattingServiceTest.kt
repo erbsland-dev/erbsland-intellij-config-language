@@ -110,6 +110,9 @@ class ElclFormattingServiceTest : BasePlatformTestCase() {
         default.FORMAT_DETECT_VALUE_NAMES = true
         assertEquals("lower", default.formatFor(source).base[FormatProperty.VALUE_CASE])
         assertEquals("underscore", default.formatFor(source).base[FormatProperty.VALUE_SEPARATOR])
+        default.FORMAT_STYLE = ElclFormatStyle(mapOf(FormatProperty.VALUE_CASE to "keep")).serialize()
+        val abbreviated = "[server]\nHTTP Port:1\nSSH Port:2\nFTP Port:3\n"
+        assertEquals("title", default.formatFor(abbreviated).base[FormatProperty.VALUE_CASE])
     }
     fun testPlaceholderPreferencePersistsAndRefreshesOpenEditor() {
         val service = ElclSettings.getInstance()

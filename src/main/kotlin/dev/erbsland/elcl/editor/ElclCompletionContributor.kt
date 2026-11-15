@@ -23,6 +23,7 @@ import dev.erbsland.elcl.validation.MODES
 import dev.erbsland.elcl.validation.MULTIPLE_TYPES
 import dev.erbsland.elcl.validation.RuleSection
 import dev.erbsland.elcl.validation.firstValue
+import dev.erbsland.elcl.validation.isReservedVrName
 import dev.erbsland.elcl.validation.normalize
 import dev.erbsland.elcl.validation.semanticVrPath
 
@@ -90,19 +91,22 @@ class ElclCompletionContributor : CompletionContributor() {
         val fields = when (section.path.lastOrNull()) {
             "vr_key" -> INDEX_FIELDS
             "vr_dependency" -> DEPENDENCY_FIELDS
-            "vr_name" -> NAME_RULE_FIELDS
             else -> nodeRuleFields(section)
         }
         return fields.filterNot(section.fields::containsKey)
     }
 
     private fun nodeRuleFields(section: RuleSection): Set<String> {
-        val type = section.fields["type"]?.value?.let(::firstValue)?.let(::normalize)
+        val type = if (section.path.lastOrNull() == "vr_name") "text"
+            else section.fields["type"]?.value?.let(::firstValue)?.let(::normalize)
         val result = linkedSetOf<String>()
         result += NODE_FIELDS
         result += VERSION_FIELDS
         if (type == null) result += CONSTRAINTS
-        if (type == "text") result += TEXT_CONSTRAINTS
+        if (type == "text") {
+            result += TEXT_CONSTRAINTS
+            result += TEXT_CONSTRAINTS.map { "not_$it" }
+        }
         if (type in IN_TYPES) result += setOf("equals", "in", "not_equals", "not_in")
         if (type in MULTIPLE_TYPES) result += setOf("multiple", "not_multiple")
         if (type in setOf("integer", "text")) result += setOf("key", "not_key")
@@ -122,10 +126,16 @@ class ElclCompletionContributor : CompletionContributor() {
         state: AnalysisState,
         styles: ElclDocumentNameStyles,
     ): List<String> = when {
-        field == "type" -> CANONICAL_TYPES.map { styles.format(it, ElclNameCategory.IDENTIFIER) }
+        field == "type" -> (if (section?.path?.lastOrNull() == "vr_name") listOf("text") else CANONICAL_TYPES)
+            .map { styles.format(it, ElclNameCategory.IDENTIFIER) }
         field == "mode" -> MODES.map { styles.format(it, ElclNameCategory.IDENTIFIER) }
         field == "use_template" -> state.sections
             .filter { it.path.firstOrNull() == "vr_template" && it.path.size == 2 }
+            .filter { template ->
+                section?.path?.lastOrNull() != "vr_name" || (!template.list &&
+                    template.fields["type"]?.value?.let(::firstValue)?.let(::normalize) == "text" &&
+                    state.sections.none { it.path.size > template.path.size && it.path.take(template.path.size) == template.path })
+            }
             .map { styles.format(it.path[1], ElclNameCategory.IDENTIFIER) }
             .distinct()
         field in BOOLEAN_FIELDS -> listOf("Yes", "No")
@@ -141,10 +151,11 @@ class ElclCompletionContributor : CompletionContributor() {
             val targetPath = semanticVrPath(target.path)
             if (targetPath.take(scope.size) != scope) return@mapNotNull null
             val relative = targetPath.drop(scope.size)
-            val entries = relative.indices.filter { relative[it] == "vr_entry" }
+            val relativeDefinition = target.path.drop(index.path.size - 1)
+            val entries = relativeDefinition.indices.filter { relativeDefinition[it] == "vr_entry" }
             if (entries.size != 1 || entries.single() == 0 || entries.single() == relative.lastIndex) return@mapNotNull null
-            val listPath = scope + relative.take(entries.single())
-            val listType = state.sections.lastOrNull { semanticVrPath(it.path) == listPath }
+            val listPath = target.path.take(index.path.size - 1 + entries.single())
+            val listType = state.sections.lastOrNull { it.path == listPath }
                 ?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
             val targetType = target.fields["type"]?.value?.let(::firstValue)?.let(::normalize)
             if (listType !in SECTION_LIST_TYPES || targetType !in setOf("integer", "text")) return@mapNotNull null
@@ -166,8 +177,8 @@ class ElclCompletionContributor : CompletionContributor() {
         val scope = semanticVrPath(dependency.path.dropLast(1))
         return state.sections.mapNotNull { candidate ->
             val path = semanticVrPath(candidate.path)
-            if (path.take(scope.size) != scope || path.size <= scope.size || path.any { it == "vr_entry" }) return@mapNotNull null
-            if (path.lastOrNull()?.startsWith("vr_") == true) return@mapNotNull null
+            if (candidate.path.take(dependency.path.size - 1) != dependency.path.dropLast(1) || path.size <= scope.size) return@mapNotNull null
+            if (candidate.path.drop(scope.size).any(::isReservedVrName)) return@mapNotNull null
             path.drop(scope.size).joinToString(".") { styles.format(it, ElclNameCategory.IDENTIFIER) }
         }.distinct()
     }
@@ -214,7 +225,6 @@ class ElclCompletionContributor : CompletionContributor() {
     private companion object {
         val INDEX_FIELDS = setOf("name", "key", "case_sensitive")
         val DEPENDENCY_FIELDS = setOf("mode", "source", "target", "error")
-        val NAME_RULE_FIELDS = setOf("title", "description", "error", "case_sensitive", "minimum", "maximum", "matches", "starts", "ends", "contains", "chars", "allowed_chars")
         val NODE_FIELDS = setOf("type", "use_template", "default", "is_optional", "title", "description", "error", "is_secret", "case_sensitive")
         val VERSION_FIELDS = setOf("version", "minimum_version", "maximum_version", "not_version")
         val NO_MINIMUM_TYPES = setOf("boolean", "not_validated", "notvalidated")

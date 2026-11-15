@@ -15,16 +15,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>Version 0.6.2</h3>
+        <h3>Version 0.6.4</h3>
         <ul>
-            <li>Show matching, syntax-highlighted examples beside each group of settings, updating as options change.</li>
-            <li>Fix quoted text-name validation and next-line scalar values, including regex patterns and URLs.</li>
-            <li>Add optional Erbsland Core placeholder highlighting, enabled by default, with separate colors for source/filter names, parameters, and delimiters.</li>
-            <li>Add built-in Reformat Code support with all Core style options, configuration files, selector rules, and live settings previews.</li>
-            <li>Keep completion naming preferences independent of formatting settings.</li>
-            <li>Update the IntelliJ Platform and Grammar-Kit Gradle plugins to 2.20.0, retaining support for IDE version 2025.2 and newer.</li>
-            <li>Redesign settings with focused Layout, Names, Sections, Lists, and Completion tabs and padded controls.</li>
-            <li>Loading elcl_format.elcl and local includes (disabled by default).</li>
+            <li>Support vr_literal_ escapes and resolve escaped names in dependency and index references.</li>
+            <li>Validate and complete Text templates and local overrides for vr_name rules.</li>
+            <li>Fix text constraints on vr_name rules with an implicit Text type.</li>
+            <li>Highlight the vr_vr_ and vr_literal_ escape prefixes separately from the regular name suffix.</li>
+            <li>Add configurable uppercase abbreviations for name formatting.</li>
+            <li>Add boolean spelling and form preferences with live previews and formatting-file support. Boolean spelling defaults to Title Case; form defaults to keeping the original.</li>
         </ul>
     ]]></change-notes>
 

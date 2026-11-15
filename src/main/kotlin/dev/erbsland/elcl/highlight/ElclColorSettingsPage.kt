@@ -93,6 +93,13 @@ class ElclColorSettingsPage : ColorSettingsPage {
             *[Server . VR Key]*
             Name: "Interface Name"
             Key: "Interface.VR Entry.Name"
+
+            # Escaped literal name: the prefix and suffix use different colors
+            [Server . VR VR Headset]
+            Type: "Text"
+
+            [Server . VR Literal Type]
+            Type: "Text"
         """.trimIndent().replace("<triple>", "\"\"\"")
     }
 }

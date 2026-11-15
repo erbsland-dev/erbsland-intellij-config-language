@@ -60,6 +60,9 @@ internal class ElclFormattingPanel : JPanel(BorderLayout()) {
             property(FormatProperty.WIDTH)
             property(FormatProperty.WRAPPING)
             hint("Values move as a whole; quoted text is never split.")
+            group("Boolean literals")
+            property(FormatProperty.BOOLEAN_CASE, "Spelling")
+            property(FormatProperty.BOOLEAN_FORM, "Form")
             group("Assignments")
             property(FormatProperty.SEPARATOR)
             property(FormatProperty.SEPARATOR_MODE, "Position separator by")
@@ -72,6 +75,9 @@ internal class ElclFormattingPanel : JPanel(BorderLayout()) {
             property(FormatProperty.INDENT_COUNT, "Indent size")
         }
         tab("Names", ElclStyleExamples.names, "Try a case and word separator. File names and paths keep their punctuation.") {
+            group("Abbreviations")
+            property(FormatProperty.ABBREVIATIONS)
+            hint("Separate words with commas or spaces; leave empty for none.<br>Matching words use uppercase whenever a case is selected.")
             group("Section names")
             property(FormatProperty.SECTION_CASE, "Case")
             property(FormatProperty.SECTION_SEPARATOR, "Between words")
@@ -181,7 +187,7 @@ internal class ElclFormattingPanel : JPanel(BorderLayout()) {
                 })
             }
             else -> {
-                val text = JTextField(property.default, 6).apply {
+                val text = JTextField(property.default, if (property == FormatProperty.ABBREVIATIONS) 20 else 6).apply {
                     document.addDocumentListener(object : DocumentListener {
                         override fun insertUpdate(e: DocumentEvent) = updatePreview()
                         override fun removeUpdate(e: DocumentEvent) = updatePreview()
@@ -329,6 +335,13 @@ internal class ElclFormattingPanel : JPanel(BorderLayout()) {
     private fun note(text: String) = JBLabel("<html>$text</html>").apply { foreground = com.intellij.util.ui.UIUtil.getContextHelpForeground() }
 
     private fun choiceLabel(property: FormatProperty, value: String): String = when (property) {
+        FormatProperty.BOOLEAN_FORM -> when (value) {
+            "keep" -> "Keep original form"
+            "true_false" -> "True / False"
+            "yes_no" -> "Yes / No"
+            "enabled_disabled" -> "Enabled / Disabled"
+            else -> "On / Off"
+        }
         FormatProperty.WRAPPING -> when (value) {
             "keep" -> "Keep existing line breaks"
             "same_line" -> "Keep values on the assignment line"

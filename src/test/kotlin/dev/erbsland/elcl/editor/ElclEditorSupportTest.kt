@@ -3,9 +3,11 @@ package dev.erbsland.elcl.editor
 import com.intellij.icons.AllIcons
 import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import dev.erbsland.elcl.psi.ElclTypes
+import dev.erbsland.elcl.highlight.ElclHighlightingLexer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -74,5 +76,50 @@ class ElclEditorSupportTest : BasePlatformTestCase() {
         )
     }
 
+    fun testEscapedVrHighlightingSurvivesDocumentChanges() {
+        myFixture.configureByText("escaped.vr.elcl", "[vr_vr_3d]\nvr_vr_type: 1\n")
+        val document = myFixture.editor.document
+        val highlighter = (myFixture.editor as EditorEx).highlighter
+        fun typeAt(offset: Int) = highlighter.createIterator(offset).tokenType
+        fun checkEscaped() {
+            assertEquals(ElclHighlightingLexer.VR_RESERVED, typeAt(1))
+            assertEquals(ElclHighlightingLexer.VR_RESERVED, typeAt(6))
+            assertEquals(ElclHighlightingLexer.SECTION_NAME, typeAt(7))
+            val assignment = document.text.indexOf('\n') + 1
+            assertEquals(ElclHighlightingLexer.VR_RESERVED, typeAt(assignment))
+            assertEquals(ElclTypes.NAME, typeAt(assignment + 6))
+        }
+        checkEscaped()
+        WriteCommandAction.runWriteCommandAction(project) { document.replaceString(7, 9, "vr_name") }
+        checkEscaped()
+        WriteCommandAction.runWriteCommandAction(project) {
+            val start = document.text.indexOf("type:")
+            document.replaceString(start, start + 4, "matches")
+        }
+        checkEscaped()
+        WriteCommandAction.runWriteCommandAction(project) { document.deleteString(1, 7) }
+        assertEquals(ElclHighlightingLexer.VR_RESERVED, typeAt(1))
+        WriteCommandAction.runWriteCommandAction(project) { document.insertString(1, "vr_vr_") }
+        checkEscaped()
+    }
+
     private fun label(element: StructureViewTreeElement): String = element.presentation.presentableText.orEmpty()
+
+    fun testLiteralVrHighlightingSurvivesPrefixAndSuffixChanges() {
+        myFixture.configureByText("literal.vr.elcl", "[vr_literal_type]\n")
+        val document = myFixture.editor.document
+        val highlighter = (myFixture.editor as EditorEx).highlighter
+        fun checkPrefix(length: Int) {
+            assertEquals(ElclHighlightingLexer.VR_RESERVED, highlighter.createIterator(1).tokenType)
+            assertEquals(ElclHighlightingLexer.VR_RESERVED, highlighter.createIterator(length).tokenType)
+            assertEquals(ElclHighlightingLexer.SECTION_NAME, highlighter.createIterator(1 + length).tokenType)
+        }
+        checkPrefix(11)
+        WriteCommandAction.runWriteCommandAction(project) { document.replaceString(12, 16, "vr_name") }
+        checkPrefix(11)
+        WriteCommandAction.runWriteCommandAction(project) { document.replaceString(1, 12, "VR VR ") }
+        checkPrefix(6)
+        WriteCommandAction.runWriteCommandAction(project) { document.replaceString(1, 7, "VR Literal ") }
+        checkPrefix(11)
+    }
 }

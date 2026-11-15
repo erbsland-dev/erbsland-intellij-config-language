@@ -32,6 +32,7 @@ internal class ElclFormatter {
 }
 
 private class Writer(private val style: ElclFormatStyle, private val documentNewline: String, private val whitespaceOnly: Boolean) {
+    private val abbreviations = style.abbreviations()
     private val indent get() = (if (style[FormatProperty.INDENT_STYLE] == "tabs") "\t" else " ").repeat(style.number(FormatProperty.INDENT_COUNT))
     private val width get() = style.number(FormatProperty.WIDTH)
 
@@ -65,7 +66,7 @@ private class Writer(private val style: ElclFormatStyle, private val documentNew
             if (statement.relative) { append('.'); if (style.enabled(FormatProperty.SPACE_AROUND_DOT)) append(' ') }
             append(statement.names.joinToString(if (style.enabled(FormatProperty.SPACE_AROUND_DOT)) " . " else ".") {
                 if (it.type == ElclTypes.TEXT_NAME) tokenText(it)
-                else formatName(it.text, style[FormatProperty.SECTION_CASE], style[FormatProperty.SECTION_SEPARATOR])
+                else formatName(it.text, style[FormatProperty.SECTION_CASE], style[FormatProperty.SECTION_SEPARATOR], abbreviations)
             })
             if (style.enabled(FormatProperty.SPACE_BEFORE_CLOSE)) append(' ')
             append(']')
@@ -94,7 +95,8 @@ private class Writer(private val style: ElclFormatStyle, private val documentNew
     private fun tokenText(token: ElclLexeme): String {
         if (whitespaceOnly) return token.text
         return when (token.type) {
-            ElclTypes.NAME, ElclTypes.META_NAME -> formatName(token.text, style[FormatProperty.VALUE_CASE], style[FormatProperty.VALUE_SEPARATOR])
+            ElclTypes.NAME, ElclTypes.META_NAME -> formatName(token.text, style[FormatProperty.VALUE_CASE], style[FormatProperty.VALUE_SEPARATOR], abbreviations)
+            ElclTypes.BOOLEAN -> formatBoolean(token.text)
             ElclTypes.TEXT, ElclTypes.TEXT_NAME -> {
                 val textName = token.type == ElclTypes.TEXT_NAME
                 val case = style[if (textName) FormatProperty.TEXT_NAME_CASE else FormatProperty.TEXT_IDENTIFIER_CASE]
@@ -102,10 +104,25 @@ private class Writer(private val style: ElclFormatStyle, private val documentNew
                 else {
                     val text = decodeElclText(token.text.removeSurrounding("\""))
                     if (!text.matches(Regex("[A-Za-z][A-Za-z0-9]*([ _][A-Za-z0-9]+)*")) || text.length > 100) token.text
-                    else quoteElclText(formatName(text, case, style[if (textName) FormatProperty.TEXT_NAME_SEPARATOR else FormatProperty.TEXT_IDENTIFIER_SEPARATOR]))
+                    else quoteElclText(formatName(text, case, style[if (textName) FormatProperty.TEXT_NAME_SEPARATOR else FormatProperty.TEXT_IDENTIFIER_SEPARATOR], abbreviations))
                 }
             }
             else -> token.text
+        }
+    }
+
+    private fun formatBoolean(text: String): String {
+        val form = style[FormatProperty.BOOLEAN_FORM]
+        val value = if (form == "keep") text else {
+            val positive = text.lowercase(java.util.Locale.ROOT) in setOf("true", "yes", "enabled", "on")
+            val pair = form.split('_')
+            pair[if (positive) 0 else 1]
+        }
+        return when (style[FormatProperty.BOOLEAN_CASE]) {
+            "lower" -> value.lowercase(java.util.Locale.ROOT)
+            "upper" -> value.uppercase(java.util.Locale.ROOT)
+            "title" -> value.lowercase(java.util.Locale.ROOT).replaceFirstChar { it.titlecase(java.util.Locale.ROOT) }
+            else -> value
         }
     }
 
@@ -209,17 +226,24 @@ private class Writer(private val style: ElclFormatStyle, private val documentNew
 }
 
 internal fun String.cpLength(): Int = codePointCount(0, length)
-internal fun formatName(text: String, case: String, separator: String): String = buildString {
-    var first = true
-    text.forEach { c ->
-        if (c == ' ' || c == '_') { append(if (separator == "space") ' ' else '_'); first = true }
-        else {
-            append(when {
-                case == "upper" || case == "title" && first -> if (c in 'a'..'z') c.uppercaseChar() else c
-                case != "keep" -> if (c in 'A'..'Z') c.lowercaseChar() else c
-                else -> c
-            })
-            if (c != '@') first = false
+internal fun formatName(text: String, case: String, separator: String, abbreviations: Set<String> = emptySet()): String {
+    val formatted = buildString {
+        var first = true
+        text.forEach { c ->
+            if (c == ' ' || c == '_') { append(if (separator == "space") ' ' else '_'); first = true }
+            else {
+                append(when {
+                    case == "upper" || case == "title" && first -> if (c in 'a'..'z') c.uppercaseChar() else c
+                    case != "keep" -> if (c in 'A'..'Z') c.lowercaseChar() else c
+                    else -> c
+                })
+                if (c != '@') first = false
+            }
         }
+    }
+    if (case == "keep" || abbreviations.isEmpty()) return formatted
+    return Regex("[^ _@]+").replace(formatted) { match ->
+        val upper = match.value.uppercase(java.util.Locale.ROOT)
+        if (upper in abbreviations) upper else match.value
     }
 }

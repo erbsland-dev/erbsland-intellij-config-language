@@ -2,9 +2,150 @@ package dev.erbsland.elcl.validation
 
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ElclVrAnalyzerTest {
+    @Test
+    fun `literal and reserved escapes decode once at every path element`() {
+        assertEquals(listOf("server", "vr_type", "vr_literal_type", "vr_vr_name"), semanticVrPath(listOf(
+            "VR Literal Server", "VR VR Type", "vr_literal_vr_literal_type", "vr_literal_vr_vr_name",
+        )))
+        assertEquals("vr_literal_type", semanticVrName("vr_vr_literal_type"))
+        val source = """
+            [Settings]
+            Type: "Section"
+            [Settings.VR Literal Type]
+            Type: "Text"
+            [Settings.vr_literal_vr_name]
+            Type: "Integer"
+            [Settings.vr_vr_template]
+            Type: "Text"
+        """.trimIndent()
+        assertNoErrors(source)
+    }
+
+    @Test
+    fun `rejects duplicate target names and invalid literal suffixes`() {
+        for ((first, second) in listOf("value" to "vr_literal_value", "vr_vr_type" to "vr_literal_vr_type",
+            "vr_vr_literal_type" to "vr_literal_vr_literal_type")) {
+            val messages = ElclTextAnalyzer().analyze("[app.$first]\ntype: \"text\"\n[app.$second]\ntype: \"text\"", true)
+            assertTrue(messages.toString(), messages.any { "same target name" in it.message })
+        }
+        val invalid = ElclTextAnalyzer().analyze("[app.vr_literal_1value]\ntype: \"text\"", true)
+        assertTrue(invalid.any { "suffix must be a regular name" in it.message })
+    }
+
+    @Test
+    fun `dependencies resolve actual literal and escaped names`() {
+        assertNoErrors("""
+            [app]
+            type: "section"
+            [app.vr_literal_type]
+            type: "text"
+            is_optional: yes
+            [app.vr_vr_type]
+            type: "text"
+            is_optional: yes
+            [app.vr_literal_vr_entry]
+            type: "text"
+            is_optional: yes
+            *[app.vr_dependency]*
+            mode: "if"
+            source: "type", "vr_type"
+            target: "vr_entry"
+        """.trimIndent())
+    }
+
+    @Test
+    fun `indexes distinguish escaped vr_entry targets from entry markers`() {
+        assertNoErrors("""
+            [vr_literal_vr_entry]
+            type: "section_list"
+            [vr_literal_vr_entry.vr_entry]
+            type: "section"
+            [vr_literal_vr_entry.vr_entry.vr_literal_type]
+            type: "text"
+            [vr_literal_vr_entry.vr_entry.vr_vr_entry]
+            type: "integer"
+            *[vr_key]*
+            name: "kinds"
+            key: "vr_entry.vr_entry.type", "vr_entry.vr_entry.vr_entry"
+        """.trimIndent())
+    }
+
+    @Test
+    fun `name rules accept text templates and merge local constraints`() {
+        val source = """
+            [vr_template.identifier]
+            type: "text"
+            minimum: 3
+            maximum: 10
+            starts: "u_"
+            [users.vr_any]
+            type: "integer"
+            [users.vr_any.vr_name]
+            use_template: "identifier"
+            minimum: 4
+            not_starts: "x_"
+        """.trimIndent()
+        assertNoErrors(source)
+        assertNoErrors(source.replace("minimum: 3", "minimum: 11"))
+        val invalid = ElclTextAnalyzer().analyze(source.replace("minimum: 4", "minimum: 11"), true)
+        assertTrue(invalid.any { "maximum must not be smaller" in it.message })
+    }
+
+    @Test
+    fun `name rules reject nontext types and structural templates`() {
+        for (type in listOf("integer", "section", "value")) {
+            val inline = ElclTextAnalyzer().analyze("[users.vr_any]\ntype: \"integer\"\n[users.vr_any.vr_name]\ntype: \"$type\"", true)
+            assertTrue(inline.toString(), inline.any { "vr_name must use type Text" in it.message })
+            val template = ElclTextAnalyzer().analyze("[vr_template.name]\ntype: \"$type\"\n[users.vr_any]\ntype: \"integer\"\n[users.vr_any.vr_name]\nuse_template: \"name\"", true)
+            assertTrue(template.toString(), template.any { "vr_name must use type Text" in it.message })
+        }
+        val base = "[vr_template.name]\ntype: \"text\"\n[users.vr_any]\ntype: \"integer\"\n[users.vr_any.vr_name]\nuse_template: \"name\""
+        val alternatives = ElclTextAnalyzer().analyze(base.replace("[vr_template.name]", "*[vr_template.name]*"), true)
+        assertTrue(alternatives.any { "cannot be alternatives" in it.message })
+        val children = ElclTextAnalyzer().analyze(base + "\n[vr_template.name.child]\ntype: \"text\"", true)
+        assertTrue(children.any { "cannot have subsections" in it.message })
+        val unknown = ElclTextAnalyzer().analyze(base.replace("\"name\"", "\"missing\""), true)
+        assertTrue(unknown.any { "Unknown validation-rules template" in it.message })
+        val missingType = ElclTextAnalyzer().analyze(base.replaceFirst("type: \"text\"", "minimum: 1"), true)
+        assertTrue(missingType.any { "vr_name must use type Text" in it.message })
+        val inheritance = ElclTextAnalyzer().analyze(base.replaceFirst("type: \"text\"", "type: \"text\"\nuse_template: \"other\""), true)
+        assertTrue(inheritance.any { "Templates cannot inherit" in it.message })
+        val invalidField = ElclTextAnalyzer().analyze(base.replaceFirst("type: \"text\"", "type: \"text\"\nunknown_constraint: 1"), true)
+        assertTrue(invalidField.any { "Unknown ELCL-VR field" in it.message })
+    }
+
+    private fun assertNoErrors(source: String) {
+        val diagnostics = ElclTextAnalyzer().analyze(source, true)
+        assertTrue(diagnostics.joinToString("\n") { it.message }, diagnostics.none { it.severity == ElclDiagnosticSeverity.ERROR })
+    }
+
+    @Test
+    fun `name rules default to text for all text constraints`() {
+        val source = """
+            [my]
+            type: "Section"
+            [my.vr_any]
+            type: "Integer"
+            [my.vr_any.vr_name]
+            matches: /[a-z]+/
+            starts: "a"
+            ends: "z"
+            contains: "m"
+            chars: "abcdefghijklmnopqrstuvwxyz"
+            in: "amz", "abmz"
+        """.trimIndent()
+        val diagnostics = ElclTextAnalyzer().analyze(source, true)
+        assertTrue(diagnostics.joinToString("\n") { it.message }, diagnostics.none { it.severity == ElclDiagnosticSeverity.ERROR })
+        val explicit = ElclTextAnalyzer().analyze(source.replace("matches:", "type: \"Text\"\nmatches:"), true)
+        assertTrue(explicit.joinToString("\n") { it.message }, explicit.none { it.severity == ElclDiagnosticSeverity.ERROR })
+        val duplicate = ElclTextAnalyzer().analyze(source.replace("\"abmz\"", "\"AMZ\""), true)
+        assertTrue(duplicate.any { "duplicate values" in it.message })
+    }
+
     @Test
     fun `accepts templates entries indexes and dependencies`() {
         val source = """

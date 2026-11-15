@@ -51,6 +51,30 @@ class ElclFormatConfigTest {
         val unsaved = ElclFormatConfig { path -> if (path == child) "[Elcl Format.Base.Names]\nValue Case: \"keep\"\n" else Files.readString(path) }
         assertEquals("keep", unsaved.read(file).base[FormatProperty.VALUE_CASE])
     }
+    @Test fun `abbreviation lists and boolean styles support base settings and rule overrides`() = directory { root ->
+        val file = write(root, "elcl_format.elcl", """
+            [Elcl Format.Base.Names]
+            Abbreviations: "api", "http"
+            [Elcl Format.Base.Boolean]
+            Case: "upper"
+            Form: "enabled_disabled"
+            *[Elcl Format.Rules]
+            [.Selector]
+            Paths: "http.api_flag"
+            [.Style.Boolean]
+            Case: "lower"
+            Form: "on_off"
+            [.Style.Names]
+            Abbreviations: ""
+        """.trimIndent())
+        val format = ElclFormatConfig().read(file)
+        assertEquals(setOf("API", "HTTP"), format.base.abbreviations())
+        val result = ElclFormatter().format("[http]\napi_flag:yes\nhttp_flag:false\n", format).text
+        assertTrue(result, result.contains("Api Flag"))
+        assertTrue(result, result.contains(": on"))
+        assertTrue(result, result.contains("HTTP Flag"))
+        assertTrue(result, result.contains(": DISABLED"))
+    }
     @Test fun `recursive include glob matches zero or more directories`() = directory { root ->
         write(root, "styles/names.elcl", "[Elcl Format.Base.Names]\nValue Case: \"upper\"\n")
         write(root, "styles/deep/section.elcl", "[Elcl Format.Base.Section]\nSuffix: 2\n")
@@ -65,6 +89,9 @@ class ElclFormatConfigTest {
             "*[Elcl Format.Rules]\n[.Selector]\nPaths:\"a.***\"\n[.Style]\nMaximum Line Length:80\n",
             "*[Elcl Format.Rules]\n[.Selector]\nPaths:\"a\"\n", "[Elcl Format.Base]\nMaximum Line Length:80,90\n",
             "@include:\"missing.elcl\"\n", "[Elcl Format.Base]\nx:???\n",
+            "[Elcl Format.Base.Names]\nAbbreviations: 1\n",
+            "[Elcl Format.Base.Names]\nAbbreviations: \"not-a-word\"\n",
+            "[Elcl Format.Base.Boolean]\nForm: \"enabled_disable\"\n",
             "[Elcl Format.Base]\nMaximum Line Length:80\nMaximum Line Length:90\n",
         )) {
             val file = write(root, "elcl_format.elcl", text)

@@ -3,18 +3,27 @@ package dev.erbsland.elcl.validation
 /** Shared normalization used for ELCL names and validation-rule identifiers. */
 internal fun normalize(value: String): String = value.trim().trim('"').lowercase().replace(Regex("[ _]+"), "_")
 
-/** True when [value] uses the validation-rules escape for a literal `vr_` name. */
-internal fun isEscapedVrName(value: String): Boolean = normalize(value).startsWith("vr_vr_")
+/** Length of the source escape prefix, including space-separated and mixed-case spellings. */
+internal fun vrEscapePrefixLength(value: CharSequence): Int = VR_ESCAPE_PREFIX.find(value)?.value?.length ?: 0
+
+private val VR_ESCAPE_PREFIX = Regex("^vr[ _](?:vr|literal)[ _](?=.)", RegexOption.IGNORE_CASE)
+
+/** True when [value] uses either validation-rules escape for a regular target name. */
+internal fun isEscapedVrName(value: String): Boolean = vrEscapePrefixLength(value) > 0
 
 /** True when [value] is reserved by the validation-rules `vr_` namespace. */
 internal fun isReservedVrName(value: String): Boolean {
     val normalized = normalize(value)
-    return normalized.startsWith("vr_") && !normalized.startsWith("vr_vr_")
+    return !value.startsWith('"') && normalized.startsWith("vr_") && !isEscapedVrName(normalized)
 }
 
 /** Maps an escaped validation-rules name to the regular name it describes. */
-internal fun semanticVrName(value: String): String = normalize(value).let {
-    if (it.startsWith("vr_vr_")) it.removePrefix("vr_") else it
+internal fun semanticVrName(value: String): String = if (value.startsWith('"')) value else normalize(value).let {
+    when {
+        it.startsWith("vr_literal_") -> it.removePrefix("vr_literal_")
+        it.startsWith("vr_vr_") -> it.removePrefix("vr_")
+        else -> it
+    }
 }
 
 /** Maps a rule-document path to the path visible in the validated document. */

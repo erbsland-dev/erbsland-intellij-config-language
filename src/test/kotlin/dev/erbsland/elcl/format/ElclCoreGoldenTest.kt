@@ -20,7 +20,9 @@ class ElclCoreGoldenTest(private val case: String) {
         val expected = if (case.startsWith("multiline-")) coreOutput
             .replace("[a-z]+  # comment", "[a-z]+ # comment")
             .replace("01 02  # bytes", "01 02 # bytes") else coreOutput
-        val style = ElclFormatConfig().read(root.resolve("elcl_format.elcl"))
+        val coreStyle = ElclFormatConfig().read(root.resolve("elcl_format.elcl"))
+        // Preserve Core's literal defaults in these captures; the plugin defaults to title-case booleans.
+        val style = coreStyle.copy(base = coreStyle.base.patched(mapOf(FormatProperty.BOOLEAN_CASE to "keep")))
         val actual = ElclFormatter().format(source, style).text
         assertEquals(case, expected, actual)
         assertEquals("$case idempotence", actual, ElclFormatter().format(actual, style).text)

@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.6.4
+
+- Fix: Recognize `vr_literal_` escapes, decode both escape forms once, and resolve dependency and index references using actual target names.
+- Fix: Validate Text templates and local overrides in `vr_name`, reject non-Text types and structural definitions, and offer template completion.
+- Fix: Treat `vr_name` rules without an explicit type as Text so text constraints work by default.
+- Highlight the `vr_vr_` and `vr_literal_` escape prefixes as validation-rule reserved names and their suffixes as regular names, including space-separated spellings.
+- Add configurable uppercase abbreviations for formatter name casing, defaulting to HTTP, HTTPS, FTP, FTPS, SSH, and VR.
+- Add independent boolean spelling (keep, lower, title, upper; title by default) and form (keep, true/false, yes/no, enabled/disabled, on/off; keep by default) controls.
+- Include live previews and optional formatting-file properties for abbreviations and boolean literals.
+
 ## Version 0.6.2
 
 - Fix: Accept quoted text names with punctuation and preserve their decoded, case-sensitive identity in validation and namespace checks.

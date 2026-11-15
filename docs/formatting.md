@@ -1,6 +1,6 @@
 # ELCL formatting and placeholders
 
-Use the IDE's **Reformat Code** action for a whole ELCL file or a selection. Selection formatting includes the complete statements touched by the selection. Formatting participates in normal undo/redo. It preserves comments, blank lines, literal spelling, multiline payload content, and the document's final-newline convention. Damaged statements remain unchanged while valid surrounding statements can be formatted.
+Use the IDE's **Reformat Code** action for a whole ELCL file or a selection. Selection formatting includes the complete statements touched by the selection. Formatting participates in normal undo/redo. It preserves comments, blank lines, multiline payload content, and the document's final-newline convention. Boolean spelling and optional form conversion follow the settings described below; other literal spelling is preserved. Damaged statements remain unchanged while valid surrounding statements can be formatted.
 
 ## IDE preferences
 
@@ -8,13 +8,17 @@ Open **Editor | Code Style | Erbsland Configuration Language**. Each tab has pad
 
 | Tab | What to try in the example |
 | --- | --- |
-| Layout | Change the assignment character or column, then choose **Always move values to the next line**. Compare short and long messages, and change continuation indentation. |
-| Names | Choose **UPPER CASE** for value names or **Underscores (two_words)** for section names. Quoted names and text identifiers stay unchanged until their own case setting is enabled. |
+| Layout | Change boolean spelling and form, the assignment character or column, wrapping, and continuation indentation. |
+| Names | Configure uppercase abbreviations, choose name case and word separators. Quoted names and text identifiers stay unchanged until their own case setting is enabled. |
 | Sections | Toggle bracket and path-dot spacing, the closing section-list star, or **Fill available width**. Filling both sides centers absolute section headers. |
 | Lists | Choose **One item per line** to turn the ports into bullet entries, or **One line** to compact the hosts. Choose **Align columns** to line up the matrix's different-width numbers. |
 | Completion | Change the preferred spelling of section names, value names, and text identifiers. The example shows fallback completion suggestions, independently of formatting preferences. |
 
 Column positions start at zero. Relative-section decorations retain Core's default rule; this is explained on the Sections tab. Invalid partial numeric input keeps the last valid preview visible and must be corrected before applying.
+
+**Uppercase abbreviations** on Names accepts words separated by commas or spaces. The defaults are `HTTP, HTTPS, FTP, FTPS, SSH, VR`; clear the field to disable exceptions. Whole words matching an abbreviation use uppercase whenever a name's case is lower, title, or upper. For example, title case turns `http_server` into `HTTP Server`, while lower case produces `HTTP server`. A name with case set to **Keep original** retains its spelling. This setting applies to section and value names and to opted-in quoted names and text identifiers; completion preferences remain independent.
+
+**Boolean literals** on Layout has independent **Spelling** and **Form** controls. Spelling supports keep, lower, title (default), and upper. Form supports keep (default), true/false, yes/no, enabled/disabled, and on/off. For example, title spelling and true/false form turn `YES, off, Enabled` into `True, False, True`. Keeping both preserves each original literal; keeping spelling while changing form uses the new lowercase pair. These controls affect scalar values, lists, and matrices, preserving each boolean's truth value. Quoted text, comments, code, and multiline payloads are unaffected.
 
 ## Configuration files
 
@@ -22,7 +26,7 @@ Configuration-file loading is **disabled by default**, including when upgrading 
 
 Enable **Load style from elcl_format.elcl files (IDE-wide)** at the top of the Code Style page to allow discovery. The checkbox note explains that the file's directory and all parent directories are scanned for `elcl_format.elcl` files. Discovery stops at the nearest match. This permission is stored in IDE preferences, separately from project code-style schemes, and takes effect when you apply the settings.
 
-When enabled, the nearest file takes precedence over IDE formatting preferences. Ancestor configurations are not merged. Unspecified properties use Core defaults, so the same file produces the same style regardless of each user's IDE settings. Files without a configuration use the active IDE/project code-style scheme. Settings previews always show the scheme being edited and never load configuration files.
+When enabled, the nearest file takes precedence over IDE formatting preferences. Ancestor configurations are not merged. Unspecified properties use built-in defaults, so the same file produces the same style regardless of each user's IDE settings. Files without a configuration use the active IDE/project code-style scheme. Settings previews always show the scheme being edited and never load configuration files. `Names.Abbreviations` and the `Boolean` group extend Core's formatting schema with the plugin's naming and literal preferences.
 
 Local `@include` commands are supported, including filename wildcards and whole-directory `**` patterns. Includes are processed in sorted order and limited to five nested documents. Placeholders are not expanded in formatting configurations. Unsaved configuration and included-file edits are used on the next format action. Invalid or unreadable configuration stops formatting and reports the problem without changing the document.
 
@@ -38,6 +42,11 @@ Value Case: "title"
 Value Separator: "space"
 Text Name Case: "keep"
 Text Identifier Case: "keep"
+Abbreviations: "HTTP", "HTTPS", "FTP", "FTPS", "SSH", "VR"
+
+[.Boolean]
+Case: "title"
+Form: "keep"
 
 [.Section]
 Indent: 4
@@ -78,7 +87,8 @@ The optional child sections beneath Base and each rule's Style accept these sett
 | Group | Properties and accepted values |
 | --- | --- |
 | Base / Style | `Maximum Line Length`: positive integer. `Value Wrapping`: `keep`, `same_line`, `next_line`, `next_line_if_fits`, `when_too_long`. |
-| Names | `Section Case`, `Value Case`, `Text Name Case`, `Text Identifier Case`: `keep`, `lower`, `title`, `upper`. Each has a corresponding `... Separator`: `space` or `underscore`. |
+| Names | `Section Case`, `Value Case`, `Text Name Case`, `Text Identifier Case`: `keep`, `lower`, `title`, `upper`. Each has a corresponding `... Separator`: `space` or `underscore`. `Abbreviations`: one text value or a text list of words; `""` disables exceptions. |
+| Boolean | `Case`: `keep`, `lower`, `title`, `upper`. `Form`: `keep`, `true_false`, `yes_no`, `enabled_disabled`, `on_off`. |
 | Section | `Indent`, `Suffix`: nonnegative integers or `"infinite"`. `Star`, `Space After Open`, `Space Before Close`, `Space Around Dot`: booleans. |
 | Vector | `Style`: `keep`, `compact`, `multiline`. `Spaces After Star`: positive integer. |
 | Matrix | `Style`: `keep`, `align`. |

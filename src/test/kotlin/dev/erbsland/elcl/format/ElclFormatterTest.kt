@@ -18,6 +18,50 @@ class ElclFormatterTest {
         assertEquals(expected, format(input))
         assertEquals(expected, format(expected))
     }
+    @Test fun `abbreviations apply to whole words in every selected case and name category`() {
+        val source = "[http_server.vr_settings]\nhttps_port:1\n\"ftp_name\": \"ssh_host\"\nhttpserver:2\n"
+        for (case in listOf("lower", "title", "upper")) {
+            val options = simple(FormatProperty.SECTION_CASE to case, FormatProperty.VALUE_CASE to case,
+                FormatProperty.TEXT_NAME_CASE to case, FormatProperty.TEXT_IDENTIFIER_CASE to case)
+            val result = format(source, options)
+            for (abbreviation in listOf("HTTP", "HTTPS", "VR", "FTP", "SSH")) assertTrue(result, result.contains(abbreviation))
+            assertFalse(result, result.contains("HTTPserver"))
+            assertEquals(result, format(result, options))
+        }
+        assertTrue(format(source, simple(FormatProperty.ABBREVIATIONS to "")).contains("[ Http Server . Vr Settings ]"))
+        assertTrue(format(source, simple(FormatProperty.ABBREVIATIONS to "SERVER")).contains("Http SERVER"))
+        assertEquals("http_SERVER", formatName("http_SERVER", "keep", "underscore", setOf("HTTP")))
+        assertEquals("HTTP_SERVER", formatName("http_server", "title", "underscore", setOf("HTTP", "SERVER")))
+        assertEquals("Httpé", formatName("httpé", "title", "space", setOf("HTTP")))
+        assertEquals("HTTP, SSH", FormatProperty.ABBREVIATIONS.validate("http, ssh HTTP"))
+        assertTrue(format("[a]\n\"http_name\":\"ssh_host\"\n").contains("\"http_name\": \"ssh_host\""))
+    }
+    @Test fun `boolean form and spelling independently normalize all literals without changing truth`() {
+        val input = "[a]\nx: tRuE, fAlSe, YES, NO, Enabled, Disabled, on, off # true stays in comments\ntext: \"true\"\ncode: `false`\nregex: /yes/\n"
+        val forms = mapOf("true_false" to listOf("true", "false"), "yes_no" to listOf("yes", "no"),
+            "enabled_disabled" to listOf("enabled", "disabled"), "on_off" to listOf("on", "off"))
+        for ((form, pair) in forms) for (case in listOf("keep", "lower", "title", "upper")) {
+            val values = List(8) { i -> pair[i % 2] }.map {
+                when (case) { "title" -> it.replaceFirstChar(Char::uppercaseChar); "upper" -> it.uppercase(); else -> it }
+            }
+            val options = simple(FormatProperty.BOOLEAN_FORM to form, FormatProperty.BOOLEAN_CASE to case)
+            val result = format(input, options)
+            assertTrue(result, result.contains("X: ${values.joinToString(", ")} # true stays in comments"))
+            assertTrue(result, result.contains("Text: \"true\"\nCode: `false`\nRegex: /yes/"))
+            assertEquals(result, format(result, options))
+        }
+        assertTrue(format(input).contains("X: True, False, Yes, No, Enabled, Disabled, On, Off"))
+        assertTrue(format(input, simple(FormatProperty.BOOLEAN_CASE to "keep")).contains("X: tRuE, fAlSe, YES, NO, Enabled, Disabled, on, off"))
+        val source = "[a]\nx:yes,OFF\ny:\n    * enabled, no\n    * TRUE, disabled\n"
+        val options = simple(FormatProperty.BOOLEAN_FORM to "true_false", FormatProperty.MATRIX to "align", FormatProperty.VECTOR to "multiline")
+        val result = format(source, options)
+        assertTrue(result, result.contains("X:\n    * True\n    * False"))
+        assertTrue(result, result.contains("* True, False"))
+        assertEquals(result, format(result, options))
+        val whitespace = ElclFormatter().format(source, options, whitespaceOnly = true).text
+        fun literals(text: String) = ElclSyntaxSnapshot(text).statements.flatMap { it.values }.map { it.text }
+        assertEquals(literals(source), literals(whitespace))
+    }
     @Test fun `default decorations relative sections and metadata match Core`() {
         val output = format("@VERSION = \"1.0\"\n[a]\nx:1\n[.b]\ny:2\n*[c]\nz:3\n", ElclFormat())
         assertTrue(output.startsWith("@version: \"1.0\"\n----[ A ]"))

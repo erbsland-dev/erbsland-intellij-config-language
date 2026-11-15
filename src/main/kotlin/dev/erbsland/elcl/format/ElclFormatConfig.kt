@@ -124,11 +124,15 @@ internal class ElclFormatConfig(private val readText: (Path) -> String = { Files
 }
 
 private fun validStyleSection(parts: List<String>): Boolean = parts.isEmpty() ||
-    parts.size == 1 && parts.single() in setOf("names", "section", "vector", "matrix", "separator", "indentation")
+    parts.size == 1 && parts.single() in setOf("names", "boolean", "section", "vector", "matrix", "separator", "indentation")
 
 private fun addStyle(target: MutableMap<FormatProperty, String>, path: String, statement: ElclStatement) {
     val property = FormatProperty.entries.firstOrNull { it.path == path } ?: error("Unknown formatting property: $path")
     require(property !in target) { "Duplicate formatting property: $path" }
+    if (property == FormatProperty.ABBREVIATIONS) {
+        target[property] = property.validate(texts(statement).joinToString(", "))
+        return
+    }
     val value = statement.values.singleOrNull() ?: error("$path requires a scalar value")
     val text = when {
         property.choices == listOf("true", "false") -> boolean(statement).toString()

@@ -101,13 +101,44 @@ class ElclHighlightingLexerTest {
     }
 
     @Test
-    fun `validation rules reserve vr names but not their escaped forms`() {
+    fun `validation rules highlight escape prefixes and keep suffixes ordinary`() {
         val tokens = lex("[App.VR Entry]\n*[App.VR Key]*\n[App.VR Headset]\n[App.VR VR Headset]\nVR VR Value: 1\n", true)
         val reserved = tokens.filter { it.type == ElclHighlightingLexer.VR_RESERVED }.map { it.text }
 
-        assertEquals(listOf("VR Entry", "VR Key", "VR Headset"), reserved)
-        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.first { it.text == "VR VR Headset" }.type)
-        assertEquals(ElclTypes.NAME, tokens.first { it.text == "VR VR Value" }.type)
+        assertEquals(listOf("VR Entry", "VR Key", "VR Headset", "VR VR ", "VR VR "), reserved)
+        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.last { it.text == "Headset" }.type)
+        assertEquals(ElclTypes.NAME, tokens.first { it.text == "Value" }.type)
+    }
+
+    @Test
+    fun `escaped names handle all spellings and restart at every fragment`() {
+        val text = "[vr_vr_3d.vR_Vr_type.VR Literal Matches]\nvr vr matches: 1\nvr_vr_vr_name: 2\nvr_literal_type: 3\n[vr_literal_vr_name.vr_literal_vr_literal_type]\n"
+        val tokens = lex(text, true)
+        assertEquals(listOf("vr_vr_", "vR_Vr_", "VR Literal ", "vr vr ", "vr_vr_", "vr_literal_", "vr_literal_", "vr_literal_"),
+            tokens.filter { it.type == ElclHighlightingLexer.VR_RESERVED }.map { it.text })
+        assertEquals(ElclTypes.NAME, tokens.first { it.text == "matches" }.type)
+        assertEquals(ElclTypes.NAME, tokens.first { it.text == "vr_name" }.type)
+        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.first { it.text == "3d" }.type)
+        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.first { it.text == "Matches" }.type)
+        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.last { it.text == "vr_name" }.type)
+        assertEquals(ElclHighlightingLexer.SECTION_NAME, tokens.first { it.text == "vr_literal_type" }.type)
+        val lexer = ElclHighlightTokenClassifier(true)
+        lexer.start(text)
+        tokens.forEach { token ->
+            val restarted = ElclHighlightTokenClassifier(true)
+            restarted.start(text, lexer.tokenStart, text.length, lexer.state)
+            assertEquals(token.type, restarted.tokenType)
+            assertEquals(token.start, restarted.tokenStart)
+            assertEquals(token.text, text.substring(restarted.tokenStart, restarted.tokenEnd))
+            restarted.advance()
+            lexer.advance()
+            assertEquals(lexer.tokenType, restarted.tokenType)
+            assertEquals(lexer.tokenStart, restarted.tokenStart)
+            assertEquals(lexer.tokenEnd, restarted.tokenEnd)
+        }
+        val ordinary = lex(text)
+        assertTrue(ordinary.none { it.type == ElclHighlightingLexer.VR_RESERVED })
+        assertTrue(ordinary.any { it.text == "vr_vr_3d" })
     }
 
     private fun lex(text: String, validationRules: Boolean = false): List<Token> {

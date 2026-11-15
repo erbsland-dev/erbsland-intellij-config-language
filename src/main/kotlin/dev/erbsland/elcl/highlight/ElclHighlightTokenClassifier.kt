@@ -7,24 +7,46 @@ import dev.erbsland.elcl.lexer.ElclLexerAdapter
 import dev.erbsland.elcl.psi.ElclTypes
 import dev.erbsland.elcl.validation.isReservedVrName
 import dev.erbsland.elcl.validation.normalize
+import dev.erbsland.elcl.validation.vrEscapePrefixLength
 
 /** Adds context-sensitive token categories without changing parser tokens. */
 internal class ElclHighlightTokenClassifier(private val validationRules: Boolean) : LexerBase() {
     private val delegate: Lexer = ElclLexerAdapter()
+    private var escapeEnd: Int? = null
+    private var escapedSuffix = false
 
-    override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) =
-        delegate.start(buffer, startOffset, endOffset, initialState)
+    override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
+        escapedSuffix = initialState and ESCAPED_SUFFIX_STATE != 0
+        // Re-lex the complete name when restarting at its suffix, which may begin with a digit.
+        val prefixLength = if (initialState and LITERAL_SUFFIX_STATE != 0) 11 else 6
+        delegate.start(buffer, if (escapedSuffix) startOffset - prefixLength else startOffset,
+            endOffset, initialState and SUFFIX_STATE_MASK.inv())
+        splitEscapedName()
+    }
 
-    override fun getState(): Int = delegate.state
-    override fun getTokenStart(): Int = delegate.tokenStart
-    override fun getTokenEnd(): Int = delegate.tokenEnd
-    override fun advance() = delegate.advance()
+    override fun getState(): Int = delegate.state or if (escapedSuffix) {
+        if (escapeEnd == delegate.tokenStart + 11) ESCAPED_SUFFIX_STATE or LITERAL_SUFFIX_STATE else ESCAPED_SUFFIX_STATE
+    } else 0
+    override fun getTokenStart(): Int = if (escapedSuffix) escapeEnd ?: delegate.tokenStart else delegate.tokenStart
+    override fun getTokenEnd(): Int = if (escapedSuffix) delegate.tokenEnd else escapeEnd ?: delegate.tokenEnd
+    override fun advance() {
+        if (escapeEnd != null && !escapedSuffix) escapedSuffix = true
+        else {
+            delegate.advance()
+            escapedSuffix = false
+            splitEscapedName()
+        }
+    }
     override fun getBufferSequence(): CharSequence = delegate.bufferSequence
     override fun getBufferEnd(): Int = delegate.bufferEnd
 
     override fun getTokenType(): IElementType? {
         val type = delegate.tokenType ?: return null
         val sectionHeader = lineText().matches(SECTION_HEADER_LINE)
+        if (escapeEnd != null) {
+            return if (!escapedSuffix) ElclHighlightTokenTypes.VR_RESERVED
+            else if (sectionHeader) ElclHighlightTokenTypes.SECTION_NAME else ElclTypes.NAME
+        }
         val text = delegate.bufferSequence.subSequence(delegate.tokenStart, delegate.tokenEnd).toString()
         if (validationRules && type == ElclTypes.NAME && isReservedVrName(text)) {
             return ElclHighlightTokenTypes.VR_RESERVED
@@ -46,6 +68,12 @@ internal class ElclHighlightTokenClassifier(private val validationRules: Boolean
         }
     }
 
+    private fun splitEscapedName() {
+        val text = delegate.bufferSequence.subSequence(delegate.tokenStart, delegate.tokenEnd)
+        val length = if (validationRules && delegate.tokenType == ElclTypes.NAME) vrEscapePrefixLength(text) else 0
+        escapeEnd = if (length > 0) delegate.tokenStart + length else null
+    }
+
     private fun lineText(): String {
         val buffer = delegate.bufferSequence
         var lineStart = delegate.tokenStart
@@ -56,6 +84,9 @@ internal class ElclHighlightTokenClassifier(private val validationRules: Boolean
     }
 
     companion object {
+        private const val ESCAPED_SUFFIX_STATE = 0x10000
+        private const val LITERAL_SUFFIX_STATE = 0x20000
+        private const val SUFFIX_STATE_MASK = ESCAPED_SUFFIX_STATE or LITERAL_SUFFIX_STATE
         private val SECTION_HEADER_LINE = Regex("-*(?:\\*)?\\[.*")
         private val SECTION_LIST_LINE = Regex("-*\\*\\[.*")
         private val SECTION_DELIMITER_TOKENS = setOf(

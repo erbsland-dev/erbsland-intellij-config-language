@@ -8,6 +8,13 @@ internal class ElclValidationRulesAnalyzer {
     fun validate(state: AnalysisState) {
         val templates = state.sections.filter { it.path.firstOrNull() == "vr_template" && it.path.size == 2 }
             .associateBy { it.path[1] }
+        // Name templates are validated as merged text rules at their usage sites.
+        val ordinaryTemplateUses = state.sections.filter {
+            it.path.firstOrNull() != "vr_template" && it.path.lastOrNull() != "vr_name"
+        }.mapNotNull { it.fields["use_template"]?.value?.let(::firstValue)?.let(::normalize) }.toSet()
+        val nameTemplateUses = state.sections.filter { it.path.lastOrNull() == "vr_name" }
+            .mapNotNull { it.fields["use_template"]?.value?.let(::firstValue)?.let(::normalize) }.toSet()
+        val deferredTemplates = nameTemplateUses - ordinaryTemplateUses
         val namedIndexes = mutableListOf<NamedIndex>()
         state.sections.filter { it.path.lastOrNull() == "vr_key" }.forEach { index ->
             index.fields["name"]?.let { field ->
@@ -23,6 +30,13 @@ internal class ElclValidationRulesAnalyzer {
             }
         }
         state.sections.forEach { section ->
+            if (section.path.firstOrNull() == "vr_template" && section.path.size >= 2 &&
+                section.path[1] in deferredTemplates) return@forEach
+            section.path.filter { it.startsWith("vr_literal_") }.forEach {
+                if (it.removePrefix("vr_literal_").firstOrNull()?.isLetter() != true) {
+                    state.error(section.range, "The vr_literal_ suffix must be a regular name starting with a letter")
+                }
+            }
             val reserved = section.path.filter(::isReservedVrName)
             reserved.filter { it !in RESERVED_NAMES }.forEach {
                 state.error(section.range, "Unknown reserved validation-rules name '$it'; use 'vr_$it' to escape a literal vr_ name")
@@ -39,7 +53,20 @@ internal class ElclValidationRulesAnalyzer {
                 else -> validateNodeRule(state, section, templates, namedIndexes)
             }
         }
+        validateTargetNames(state)
         validateAlternatives(state)
+    }
+
+    /** Escapes change target names, but never turn a literal target into a control node. */
+    private fun validateTargetNames(state: AnalysisState) {
+        state.sections.filter { it.path.firstOrNull() != "vr_template" }
+            .groupBy { section -> section.path.map { isReservedVrName(it) to semanticVrName(it) } }
+            .values.filter { rules -> rules.map { it.path }.distinct().size > 1 }
+            .forEach { rules ->
+                rules.drop(1).forEach {
+                    state.error(it.range, "Multiple rule definitions resolve to the same target name '${semanticVrPath(it.path).joinToString(".")}'")
+                }
+            }
     }
 
     private fun validateAlternatives(state: AnalysisState) {
@@ -84,9 +111,11 @@ internal class ElclValidationRulesAnalyzer {
         val effectiveType = type?.value?.let(::firstValue)?.let(::normalize)
             ?: useTemplate?.value?.let(::firstValue)?.let(::normalize)
                 ?.let { templates[it]?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize) }
+            ?: "text".takeIf { isName && type == null && useTemplate == null }
+        val rule = if (isName) validateNameRule(state, section, templates, effectiveType) else section
         if (last == "vr_entry") validateEntry(state, section, type, effectiveType)
-        if (section.fields.containsKey("default") && section.fields.containsKey("is_optional")) {
-            state.error(section.fields.getValue("is_optional").nameRange, "A default already makes the node optional; is_optional must not also be set")
+        if (rule.fields.containsKey("default") && rule.fields.containsKey("is_optional")) {
+            state.error(rule.fields.getValue("is_optional").nameRange, "A default already makes the node optional; is_optional must not also be set")
         }
         if (section.fields.containsKey("default") && effectiveType in STRUCTURAL_TYPES) {
             state.error(section.fields.getValue("default").nameRange, "Defaults are only valid for scalar values and value lists")
@@ -94,7 +123,7 @@ internal class ElclValidationRulesAnalyzer {
         if (section.fields.containsKey("is_secret") && effectiveType in STRUCTURAL_TYPES) {
             state.error(section.fields.getValue("is_secret").nameRange, "is_secret is only valid for scalar values")
         }
-        section.fields["key"]?.let { field ->
+        rule.fields["key"]?.let { field ->
             valueList(field.value).forEach { reference ->
                 val indexName = normalize(reference.substringBefore('['))
                 if (findVisibleIndex(indexName, semanticVrPath(section.path), indexes) == null) {
@@ -109,7 +138,42 @@ internal class ElclValidationRulesAnalyzer {
             }
             if (!hasEntry) state.error(section.range, "List and matrix rules require a vr_entry definition")
         }
-        validateFieldsAndConstraints(state, section, effectiveType)
+        validateFieldsAndConstraints(state, rule, if (isName) "text" else effectiveType)
+    }
+
+    /** Checks name rules after merging template constraints with local overrides. */
+    private fun validateNameRule(
+        state: AnalysisState,
+        section: RuleSection,
+        templates: Map<String, RuleSection>,
+        effectiveType: String?,
+    ): RuleSection {
+        val useTemplate = section.fields["use_template"]
+        val template = useTemplate?.value?.let(::firstValue)?.let(::normalize)?.let(templates::get)
+        if (effectiveType != "text" && (section.fields["type"] != null || template != null)) {
+            state.error(useTemplate?.valueRange ?: section.fields["type"]?.valueRange ?: section.range,
+                "vr_name must use type Text, including when provided by a template")
+        }
+        template?.fields?.get("use_template")?.let {
+            state.error(it.nameRange, "Templates cannot inherit from another template")
+        }
+        if (section.list || template?.list == true) {
+            state.error(useTemplate?.valueRange ?: section.range, "vr_name definitions and their templates cannot be alternatives")
+        }
+        listOfNotNull(section, template).forEach { definition ->
+            if (state.sections.any { it.path.size > definition.path.size && it.path.take(definition.path.size) == definition.path }) {
+                state.error(useTemplate?.valueRange ?: section.range, "vr_name definitions and their templates cannot have subsections")
+            }
+        }
+        val fields = linkedMapOf<String, RuleField>()
+        template?.fields?.let(fields::putAll)
+        // A local positive/negative constraint replaces the template's opposite form.
+        section.fields.keys.filterNot { it.endsWith("_error") }.forEach { name ->
+            val base = name.removePrefix("not_")
+            if (base in NEGATABLE) fields.remove(if (name.startsWith("not_")) base else "not_$base")
+        }
+        fields.putAll(section.fields)
+        return section.copy(fields = fields)
     }
 
     private fun findVisibleIndex(name: String, nodePath: List<String>, indexes: List<NamedIndex>): NamedIndex? =
@@ -197,19 +261,25 @@ internal class ElclValidationRulesAnalyzer {
 
     private fun validateDependencyReference(state: AnalysisState, dependency: RuleSection, field: RuleField, reference: String) {
         val relative = reference.split('.').map(::normalize)
-        if (relative.any { it == "vr_entry" }) {
+        val scope = dependency.path.dropLast(1)
+        val path = semanticVrPath(scope) + relative
+        val rules = state.sections.filter {
+            it.path.take(scope.size) == scope && semanticVrPath(it.path) == path &&
+                it.path.drop(scope.size).none { name -> isReservedVrName(name) && name != "vr_entry" }
+        }
+        if (rules.any { "vr_entry" in it.path.drop(scope.size) }) {
             state.error(field.valueRange, "Dependencies cannot reference values inside section-list entries")
             return
         }
-        val path = dependency.path.dropLast(1) + relative
-        val rules = state.sections.filter { it.path == path }
         if (rules.isEmpty()) {
             state.error(field.valueRange, "Dependency reference '$reference' has no node-rule definition in this scope")
             return
         }
         if (rules.size > 1 || rules.any { it.list }) state.error(field.valueRange, "Dependencies cannot reference nodes defined by alternatives")
-        val conditionallyPresent = path.indices.any { index ->
-            state.sections.filter { it.path == path.take(index + 1) }.any { "is_optional" in it.fields || "default" in it.fields }
+        val conditionallyPresent = rules.any { rule ->
+            rule.path.indices.any { index ->
+                state.sections.filter { it.path == rule.path.take(index + 1) }.any { "is_optional" in it.fields || "default" in it.fields }
+            }
         }
         if (!conditionallyPresent) state.error(field.valueRange, "Dependency reference '$reference' is unconditionally required")
     }
@@ -224,13 +294,14 @@ internal class ElclValidationRulesAnalyzer {
             val listRoots = mutableSetOf<List<String>>()
             valueList(field.value).forEach { reference ->
                 val relativePath = reference.split('.').map(::normalize)
-                val resolved = resolveIndexPath(state, semanticVrPath(section.path.dropLast(1)), relativePath)
+                val resolved = resolveIndexPath(state, section.path.dropLast(1), relativePath)
                 if (resolved == null) {
                     state.error(field.valueRange, "Index key path must reference a value below exactly one SectionList vr_entry")
                     return@forEach
                 }
                 listRoots += resolved.first
-                val targetType = findSection(state, resolved.second)?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
+                val targetType = state.sections.find { it.path == resolved.second }
+                    ?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
                 if (targetType !in setOf("integer", "text")) {
                     state.error(field.valueRange, "Indexed values must use type Integer or Text")
                 }
@@ -245,33 +316,24 @@ internal class ElclValidationRulesAnalyzer {
         scope: List<String>,
         relativePath: List<String>,
     ): Pair<List<String>, List<String>>? {
-        val entryIndexes = relativePath.indices.filter { relativePath[it] == "vr_entry" }
-        if (entryIndexes.size > 1) return null
-        if (entryIndexes.size == 1) {
-            val entryIndex = entryIndexes.single()
-            if (entryIndex == 0 || entryIndex == relativePath.lastIndex) return null
-            val listPath = scope + relativePath.take(entryIndex)
-            val targetPath = scope + relativePath
-            return if (sectionType(state, listPath) in SECTION_LIST_TYPES && findSection(state, targetPath) != null) {
-                listPath to targetPath
-            } else null
-        }
-
-        // Compatibility form: list.value -> list.vr_entry.value.
-        for (insertion in 1 until relativePath.size) {
-            val listPath = scope + relativePath.take(insertion)
-            if (sectionType(state, listPath) !in SECTION_LIST_TYPES) continue
-            val targetPath = scope + relativePath.take(insertion) + "vr_entry" + relativePath.drop(insertion)
-            if (findSection(state, targetPath) != null) return listPath to targetPath
+        for (target in state.sections) {
+            if (target.path.take(scope.size) != scope) continue
+            val relativeDefinition = target.path.drop(scope.size)
+            val entries = relativeDefinition.indices.filter { relativeDefinition[it] == "vr_entry" }
+            if (entries.size != 1) continue
+            val entry = entries.single()
+            if (entry == 0 || entry == relativeDefinition.lastIndex) continue
+            val listPath = scope + relativeDefinition.take(entry)
+            val listType = state.sections.find { it.path == listPath }
+                ?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
+            if (listType !in SECTION_LIST_TYPES) continue
+            val semanticPath = semanticVrPath(relativeDefinition)
+            // Compatibility form: list.value -> list.vr_entry.value.
+            val withoutEntry = semanticPath.filterIndexed { index, _ -> index != entry }
+            if (relativePath == semanticPath || relativePath == withoutEntry) return listPath to target.path
         }
         return null
     }
-
-    private fun findSection(state: AnalysisState, semanticPath: List<String>): RuleSection? =
-        state.sections.find { semanticVrPath(it.path) == semanticPath }
-
-    private fun sectionType(state: AnalysisState, semanticPath: List<String>): String? =
-        findSection(state, semanticPath)?.fields?.get("type")?.value?.let(::firstValue)?.let(::normalize)
 
     private companion object {
         val VALUE_COLLECTION_TYPES = setOf("value_list", "valuelist", "value_matrix", "valuematrix")

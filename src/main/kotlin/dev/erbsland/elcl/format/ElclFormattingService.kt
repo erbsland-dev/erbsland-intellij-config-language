@@ -65,7 +65,8 @@ internal fun ElclCodeStyleSettings.formatFor(text: String): ElclFormat {
                 letters.isEmpty() -> null
                 letters.all(Char::isLowerCase) -> "lower"
                 letters.all(Char::isUpperCase) -> "upper"
-                sample.split(' ', '_').all { it.firstOrNull()?.isUpperCase() == true && it.drop(1).all { c -> !c.isLetter() || c.isLowerCase() } } -> "title"
+                sample.split(' ', '_').all { word -> word in style.abbreviations() ||
+                    word.firstOrNull()?.isUpperCase() == true && word.drop(1).all { c -> !c.isLetter() || c.isLowerCase() } } -> "title"
                 else -> null
             }
         }

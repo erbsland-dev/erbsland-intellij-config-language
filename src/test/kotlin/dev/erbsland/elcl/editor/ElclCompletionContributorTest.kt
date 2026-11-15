@@ -64,6 +64,62 @@ class ElclCompletionContributorTest : BasePlatformTestCase() {
         myFixture.checkResult("[Server]\nType: \"Section\"\nIs Optional: Yes")
     }
 
+    fun testNameRulesOfferTemplatesAndOnlyTextTypes() {
+        configure("[Users.VR Any.VR Name]\n<caret>")
+        val fields = complete()
+        assertContains(fields, "Type")
+        assertContains(fields, "Use Template")
+        assertContains(fields, "Not Starts")
+
+        configure("[Users.VR Any.VR Name]\nType: \"Text\"\n<caret>")
+        assertTrue(complete().none { it.lookupString == "Use Template" })
+        configure("[Users.VR Any.VR Name]\nUse Template: \"Name\"\n<caret>")
+        assertTrue(complete().none { it.lookupString == "Type" })
+
+        configure("[Users.VR Any.VR Name]\nType: \"<caret>")
+        val types = complete()
+        assertTrue(types.none { it.lookupString == "Integer" || it.lookupString == "Section" })
+        assertTrue(types.any { it.lookupString == "Text" } || myFixture.editor.document.text.endsWith("Type: \"Text\""))
+
+        configure("[VR Template.Name]\nType: \"Text\"\n[Users.VR Any.VR Name]\nUse Template: \"N<caret>")
+        assertSuggestedOrInserted("Name")
+    }
+
+    fun testReferencesOfferActualEscapedNames() {
+        configure("""
+            [App.VR Literal Type]
+            Type: "Text"
+            Is Optional: Yes
+            [App.VR VR Type]
+            Type: "Text"
+            Is Optional: Yes
+            [App.VR Literal VR Entry]
+            Type: "Text"
+            Is Optional: Yes
+            *[App.VR Dependency]*
+            Source: "<caret>
+        """.trimIndent())
+        val dependencies = complete()
+        assertContains(dependencies, "Type")
+        assertContains(dependencies, "VR Type")
+        assertContains(dependencies, "VR Entry")
+        assertTrue(dependencies.none { "Literal" in it.lookupString || "VR VR" in it.lookupString })
+
+        configure("""
+            [VR Literal VR Entry]
+            Type: "Section List"
+            [VR Literal VR Entry.VR Entry.VR Literal Type]
+            Type: "Text"
+            [VR Literal VR Entry.VR Entry.VR VR Entry]
+            Type: "Integer"
+            *[VR Key]*
+            Key: "<caret>
+        """.trimIndent())
+        val keys = complete()
+        assertContains(keys, "VR Entry.VR Entry.Type")
+        assertContains(keys, "VR Entry.VR Entry.VR Entry")
+    }
+
     fun testCompletionDoesNotRunForOrdinaryElclFiles() {
         myFixture.configureByText("ordinary.elcl", "[Server]\nT<caret>")
         assertTrue(myFixture.completeBasic().orEmpty().none { it.lookupString == "Type" })
